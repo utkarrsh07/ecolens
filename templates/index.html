@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EcoLens | Environmental Intelligence Prototype</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+  <div class="background-glow glow-1"></div>
+  <div class="background-glow glow-2"></div>
+  <div class="background-glow glow-3"></div>
+  <div class="grid-overlay"></div>
+
+  <header class="hero" id="top">
+    <nav class="navbar">
+      <div class="logo">EcoLens</div>
+
+      <div class="nav-links">
+        <a href="#platform" class="nav-scroll">Platform</a>
+        <a href="#dashboard" class="nav-scroll">Dashboard</a>
+        <a href="#ai-engine" class="nav-scroll">AI Engine</a>
+        <a href="#methodology" class="nav-scroll">Method</a>
+        <a href="#contact" class="nav-scroll">Contact</a>
+      </div>
+
+      <button class="nav-menu-btn" id="navMenuBtn" type="button">Menu</button>
+    </nav>
+
+    <div class="mobile-menu" id="mobileMenu">
+      <a href="#platform" class="nav-scroll">Platform</a>
+      <a href="#dashboard" class="nav-scroll">Dashboard</a>
+      <a href="#ai-engine" class="nav-scroll">AI Engine</a>
+      <a href="#methodology" class="nav-scroll">Method</a>
+      <a href="#contact" class="nav-scroll">Contact</a>
+    </div>
+
+    <div class="hero-content">
+      <div class="hero-text">
+        <p class="eyebrow">AI-Assisted Environmental Intelligence</p>
+        <h1>Transform watershed and environmental report-card data into clear, decision-ready insights.</h1>
+        <p class="hero-subtext">
+          EcoLens is a data interpretation prototype that helps translate technical environmental datasets
+          into visual trends, ranked findings, and audience-specific summaries for analysts, policy teams,
+          and public communication.
+        </p>
+
+        <div class="hero-buttons">
+          <button class="primary-btn" onclick="scrollToSection('dashboard')">Launch Dashboard</button>
+          <button class="secondary-btn" onclick="scrollToSection('platform')">Explore Platform</button>
+        </div>
+
+        <div class="hero-metrics">
+          <div class="hero-metric">
+            <span class="hero-metric-label">Records Processed</span>
+            <strong>{{ subwatershed_count }}</strong>
+          </div>
+          <div class="hero-metric">
+            <span class="hero-metric-label">Primary Data Source</span>
+            <strong>Open Watershed Report Cards</strong>
+          </div>
+          <div class="hero-metric">
+            <span class="hero-metric-label">Insight Mode</span>
+            <strong>Analyst + Public + Policy</strong>
+          </div>
+        </div>
+      </div>
+
+      <div class="hero-card reveal">
+        <div class="mini-badge">Live Prototype</div>
+        <h3>Environmental Report Card Intelligence Layer</h3>
+        <p>
+          EcoLens ingests real environmental grading data, standardizes indicator results,
+          highlights weak and strong areas, and generates explainable summaries for multiple audiences.
+        </p>
+
+        <div class="hero-card-list">
+          <div class="hero-card-item">Watershed report-card analysis</div>
+          <div class="hero-card-item">AI-assisted interpretation workflow</div>
+          <div class="hero-card-item">Public and analyst communication modes</div>
+          <div class="hero-card-item">Future-ready for live data integration</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="platform-section section-shell reveal" id="platform">
+      <div class="section-heading">
+        <p class="section-label">Platform Overview</p>
+        <h2>What EcoLens is designed to do</h2>
+        <p class="section-copy">
+          This prototype is designed to support environmental analysis, planning conversations,
+          report-card interpretation, and public-facing communication by turning raw indicator data
+          into usable insights.
+        </p>
+      </div>
+
+      <div class="feature-grid">
+        <article class="feature-card">
+          <h3>Data Interpretation</h3>
+          <p>Reads structured environmental datasets and converts grade-based indicators into comparable analysis metrics.</p>
+        </article>
+
+        <article class="feature-card">
+          <h3>Insight Generation</h3>
+          <p>Identifies stronger categories, weaker categories, priority areas, and key findings for rapid review.</p>
+        </article>
+
+        <article class="feature-card">
+          <h3>Audience Translation</h3>
+          <p>Produces summaries tailored for analysts, policy discussions, and public communication needs.</p>
+        </article>
+
+        <article class="feature-card">
+          <h3>Scalable Concept</h3>
+          <p>Can later be expanded to support live API feeds, multi-dataset dashboards, maps, and conversational querying.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="dashboard section-shell" id="dashboard">
+      <div class="section-heading reveal">
+        <p class="section-label">Interactive Dashboard</p>
+        <h2>Watershed Report Card Analysis Overview</h2>
+        <p class="section-copy">
+          This dashboard uses a real watershed report-card dataset and converts its grade fields into
+          a visual and explainable environmental intelligence layer.
+        </p>
+      </div>
+
+      <section class="stats-grid reveal">
+        <div class="stat-card">
+          <span class="stat-label">Subwatersheds Reviewed</span>
+          <h3>{{ subwatershed_count }}</h3>
+          <p>Distinct records analyzed from the selected report-card dataset.</p>
+        </div>
+
+        <div class="stat-card">
+          <span class="stat-label">Overall Profile</span>
+          <h3>{{ dominant_label }}</h3>
+          <p>Combined reading across overall forest and surface water quality indicators.</p>
+        </div>
+
+        <div class="stat-card">
+          <span class="stat-label">Highest Category</span>
+          <h3>{{ highest_category }}</h3>
+          <p>Best-performing average indicator group in the current dataset.</p>
+        </div>
+
+        <div class="stat-card">
+          <span class="stat-label">Needs Review</span>
+          <h3>{{ flagged_count }}</h3>
+          <p>Subwatersheds flagged because at least one major indicator scored low.</p>
+        </div>
+      </section>
+
+      <section class="content-grid">
+        <div class="glass-card reveal">
+          <div class="panel-header">
+            <h3>Surface Water Quality Grade Distribution</h3>
+            <span class="panel-tag">Data-Driven View</span>
+          </div>
+          <div class="chart-box">
+            {{ chart_bar_html|safe }}
+          </div>
+        </div>
+
+        <div class="glass-card insights-panel reveal" id="ai-engine">
+          <div class="panel-header">
+            <h3>AI Interpretation Engine</h3>
+            <span class="panel-tag">Audience Modes</span>
+          </div>
+
+          <div class="toggle-container">
+            <button id="analystBtn" class="toggle-btn active" type="button">Analyst</button>
+            <button id="publicBtn" class="toggle-btn" type="button">Public</button>
+            <button id="policyBtn" class="toggle-btn" type="button">Policy</button>
+          </div>
+
+          <div id="analystView" class="insight-block">
+            <h4>Analyst Summary</h4>
+            <p>{{ analyst_summary }}</p>
+          </div>
+
+          <div id="publicView" class="insight-block hidden-view">
+            <h4>Public Summary</h4>
+            <p>{{ public_summary }}</p>
+          </div>
+
+          <div id="policyView" class="insight-block hidden-view">
+            <h4>Policy / Planning Summary</h4>
+            <p>{{ policy_summary }}</p>
+          </div>
+
+          <div class="insight-block accent-block">
+            <h4>Current AI Layer</h4>
+            <p>{{ ai_note }}</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="triple-grid">
+        <div class="glass-card reveal">
+          <div class="panel-header">
+            <h3>Environmental Indicator Profile</h3>
+            <span class="panel-tag">Category Balance</span>
+          </div>
+          <div class="chart-box">
+            {{ chart_radar_html|safe }}
+          </div>
+        </div>
+
+        <div class="glass-card reveal">
+          <div class="panel-header">
+            <h3>Top Performing Areas</h3>
+            <span class="panel-tag">Combined Score</span>
+          </div>
+          <div class="chart-box">
+            {{ chart_top_html|safe }}
+          </div>
+        </div>
+
+        <div class="glass-card reveal">
+          <div class="panel-header">
+            <h3>Key Signal Board</h3>
+            <span class="panel-tag">Fast Review</span>
+          </div>
+
+          <div class="signal-list">
+            <div class="signal-item">
+              <span class="signal-label">Average Forest Score</span>
+              <strong>{{ forest_average }}</strong>
+            </div>
+
+            <div class="signal-item">
+              <span class="signal-label">Average Water Score</span>
+              <strong>{{ water_average }}</strong>
+            </div>
+
+            <div class="signal-item">
+              <span class="signal-label">Strongest Category</span>
+              <strong>{{ highest_category }}</strong>
+            </div>
+
+            <div class="signal-item">
+              <span class="signal-label">Weakest Category</span>
+              <strong>{{ lowest_category }}</strong>
+            </div>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <section class="section-shell findings-section">
+      <div class="section-heading reveal">
+        <p class="section-label">Priority Findings</p>
+        <h2>Where the dataset suggests closer attention</h2>
+        <p class="section-copy">
+          EcoLens identifies both strong performers and lower-performing areas so that environmental datasets
+          become easier to act on, not just easier to read.
+        </p>
+      </div>
+
+      <div class="dual-grid">
+        <div class="glass-card reveal">
+          <div class="panel-header">
+            <h3>Top Strengths</h3>
+            <span class="panel-tag">Positive Signals</span>
+          </div>
+
+          <div class="list-stack">
+            {% for item in strengths %}
+            <div class="rank-card">
+              <div>
+                <h4>{{ item.name }}</h4>
+                <p>High combined environmental performance across the available overall indicators.</p>
+              </div>
+              <span class="score-pill">{{ item.score }}</span>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="glass-card reveal">
+          <div class="panel-header">
+            <h3>Attention Areas</h3>
+            <span class="panel-tag">Priority Review</span>
+          </div>
+
+          <div class="list-stack">
+            {% for item in attention_areas %}
+            <div class="rank-card warning-card">
+              <div>
+                <h4>{{ item.name }}</h4>
+                <p>Potential priority area for deeper analysis, communication, or targeted intervention.</p>
+              </div>
+              <span class="score-pill">{{ item.score }}</span>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section-shell reveal">
+      <div class="section-heading">
+        <p class="section-label">Dataset Preview</p>
+        <h2>Structured environmental data at a glance</h2>
+        <p class="section-copy">
+          The table below shows the type of report-card information EcoLens can read, clean, and interpret.
+        </p>
+      </div>
+
+      <div class="glass-card table-card">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                {% for col in preview_columns %}
+                <th>{{ col }}</th>
+                {% endfor %}
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in preview_records %}
+              <tr>
+                {% for col in preview_columns %}
+                <td>{{ row[col] }}</td>
+                {% endfor %}
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="section-shell methodology-grid" id="methodology">
+      <div class="glass-card reveal">
+        <div class="panel-header">
+          <h3>Why This Matters</h3>
+          <span class="panel-tag">Communication Gap</span>
+        </div>
+        <p>{{ why_it_matters }}</p>
+      </div>
+
+      <div class="glass-card reveal">
+        <div class="panel-header">
+          <h3>Methodology</h3>
+          <span class="panel-tag">Prototype Logic</span>
+        </div>
+        <p>{{ methodology_note }}</p>
+      </div>
+
+      <div class="glass-card reveal">
+        <div class="panel-header">
+          <h3>Data Source</h3>
+          <span class="panel-tag">Open Environmental Data</span>
+        </div>
+        <div class="data-source-list">
+          <div class="data-source-item">
+            <span>Name</span>
+            <strong>{{ data_source_name }}</strong>
+          </div>
+          <div class="data-source-item">
+            <span>Organization</span>
+            <strong>{{ data_source_org }}</strong>
+          </div>
+          <div class="data-source-item">
+            <span>Update Note</span>
+            <strong>{{ data_last_updated }}</strong>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section-shell reveal">
+      <div class="section-heading">
+        <p class="section-label">Future Expansion</p>
+        <h2>How EcoLens can become even stronger</h2>
+      </div>
+
+      <div class="feature-grid">
+        <article class="feature-card">
+          <h3>Live ArcGIS/API Integration</h3>
+          <p>Automatically refresh datasets from open data portals instead of relying only on manual CSV downloads.</p>
+        </article>
+
+        <article class="feature-card">
+          <h3>Map-Based Views</h3>
+          <p>Connect grades and findings to watershed polygons or station locations for spatial interpretation.</p>
+        </article>
+
+        <article class="feature-card">
+          <h3>Real LLM Summaries</h3>
+          <p>Use a language model to generate richer stakeholder summaries from verified computed metrics.</p>
+        </article>
+
+        <article class="feature-card">
+          <h3>Ask EcoLens</h3>
+          <p>Add a question box that answers natural-language questions about flagged areas, category performance, and trends.</p>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer section-shell reveal" id="contact">
+    <div class="footer-grid">
+      <div>
+        <h3>EcoLens</h3>
+        <p>
+          Independent environmental intelligence prototype focused on turning technical datasets
+          into clearer insights for analysis, policy discussion, and public communication.
+        </p>
+      </div>
+
+      <div>
+        <h4>Prototype Focus</h4>
+        <p>Environmental data visualization, report-card interpretation, AI-assisted summaries, and communication-ready insight generation.</p>
+      </div>
+
+      <div>
+        <h4>Suggested Next Step</h4>
+        <p>Connect additional conservation authority datasets and add a real LLM-powered explanation workflow.</p>
+      </div>
+    </div>
+
+    <button class="back-top-btn" type="button" onclick="scrollToSection('top')">Back to Top</button>
+  </footer>
+
+  <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>
