@@ -5,8 +5,10 @@ import plotly.graph_objects as go
 
 import json
 import os
+import math
 from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
+from urllib.parse import urlencode
 
 
 app = Flask(__name__)
@@ -16,16 +18,25 @@ app = Flask(__name__)
 # ECOLENS DATA CONFIGURATION
 # ============================================================
 
-ARCGIS_GEOJSON_URL = (
+ARCGIS_QUERY_URL = (
     "https://utility.arcgis.com/usrsvcs/servers/"
     "d975ecae96a84eba81f67b44d9e33c9d/"
     "rest/services/ms-opendata/"
     "CH_WatershedReportCard_2023_SWGrading/"
     "MapServer/0/query"
-    "?outFields=*"
-    "&where=1%3D1"
-    "&f=geojson"
 )
+
+ARCGIS_FIELDS = [
+    "SUBWSHD_NAME",
+    "GRADE_FC_OVERALL",
+    "GRADE_FC_COVER",
+    "GRADE_FC_INTERIOR",
+    "GRADE_FC_RIPARIAN",
+    "GRADE_SWQ_OVERALL",
+    "GRADE_SWQ_BENTHIC",
+    "GRADE_SWQ_ECOLI",
+    "GRADE_SWQ_PHOSPH",
+]
 
 LOCAL_CSV_PATH = "data/conservation_halton_report_card.csv"
 
@@ -50,6 +61,40 @@ GRADE_SCORE_MAP = {
     "F": 0.0
 }
 
+# ============================================================
+# ECOLENS ENVIRONMENTAL PRIORITY ENGINE
+# 0-100 environmental scoring scale
+# ============================================================
+
+ENVIRONMENTAL_GRADE_MAP = {
+    "A+": 100,
+    "A": 96,
+    "A-": 92,
+    "B+": 88,
+    "B": 84,
+    "B-": 80,
+    "C+": 74,
+    "C": 68,
+    "C-": 62,
+    "D+": 55,
+    "D": 48,
+    "D-": 42,
+    "F": 25
+}
+
+
+FOREST_COMPONENT_WEIGHTS = {
+    "Forest Cover": 0.35,
+    "Forest Interior": 0.35,
+    "Forest Riparian": 0.30
+}
+
+
+WATER_COMPONENT_WEIGHTS = {
+    "Benthic": 0.40,
+    "E. coli": 0.30,
+    "Phosphorus": 0.30
+}
 
 # ============================================================
 # DATA LOADING
@@ -57,34 +102,64 @@ GRADE_SCORE_MAP = {
 
 def fetch_live_geojson():
     """
-    Retrieve the live Conservation Halton watershed dataset
-    from the ArcGIS REST API.
+    Retrieve live Conservation Halton watershed geometry and grades.
 
-    Returns:
-        dict: Raw GeoJSON FeatureCollection.
+    Geometry is generalized by ArcGIS before transmission so EcoLens
+    does not need to download the full-resolution watershed polygons.
     """
 
+    params = {
+        "where": "1=1",
+
+        # Only download attributes EcoLens actually uses.
+        "outFields": ",".join(ARCGIS_FIELDS),
+
+        "returnGeometry": "true",
+
+        # Leaflet / GeoJSON coordinates.
+        "outSR": "4326",
+
+        # ArcGIS performs real geometry generalization BEFORE sending
+        # the response to EcoLens.
+        #
+        # 0.00005 degrees is roughly 5 metres north/south around
+        # Conservation Halton. This is small relative to normal
+        # dashboard map resolution while eliminating unnecessary
+        # boundary vertices.
+        "maxAllowableOffset": "0.00005",
+
+        # Avoid transmitting meaningless coordinate precision.
+        "geometryPrecision": "5",
+
+        "f": "geojson",
+    }
+
+    request_url = ARCGIS_QUERY_URL + "?" + urlencode(params)
+
     request = Request(
-        ARCGIS_GEOJSON_URL,
+        request_url,
         headers={
             "User-Agent": "EcoLens/1.0",
-            "Accept": "application/geo+json, application/json"
-        }
+            "Accept": "application/geo+json, application/json",
+        },
     )
 
     try:
-        with urlopen(request, timeout=12) as response:
+        with urlopen(request, timeout=20) as response:
             raw_data = response.read().decode("utf-8")
-
-        geojson = json.loads(raw_data)
+            geojson = json.loads(raw_data)
 
         if geojson.get("type") != "FeatureCollection":
-            raise ValueError("ArcGIS response was not a GeoJSON FeatureCollection.")
+            raise ValueError(
+                "ArcGIS response was not a GeoJSON FeatureCollection."
+            )
 
         features = geojson.get("features", [])
 
         if not features:
-            raise ValueError("ArcGIS returned zero watershed features.")
+            raise ValueError(
+                "ArcGIS returned zero watershed features."
+            )
 
         return geojson
 
@@ -260,6 +335,587 @@ def score_to_label(score):
 
     return "Critical"
 
+def environmental_grade_to_score(value):
+    """
+    Convert a report-card letter grade into EcoLens' 0-100 scale.
+    Missing or insufficient data remains None and is never treated as zero.
+    """
+
+    grade = clean_grade(value)
+
+    if grade is None:
+        return None
+
+    if grade in {
+        "INSUFFICIENT DATA",
+        "NO DATA"
+    }:
+        return None
+
+    return ENVIRONMENTAL_GRADE_MAP.get(
+        grade,
+        None
+    )
+
+
+def weighted_domain_score(grades, weights):
+    """
+    Calculates a weighted domain score using only indicators that
+    actually contain valid data.
+
+    Missing indicators are removed and the remaining weights are
+    automatically normalized.
+
+    Returns:
+        score
+        coverage
+    """
+
+    weighted_total = 0
+    available_weight = 0
+
+    for indicator, weight in weights.items():
+
+        score = environmental_grade_to_score(
+            grades.get(indicator)
+        )
+
+        if score is None:
+            continue
+
+        weighted_total += score * weight
+        available_weight += weight
+
+    if available_weight == 0:
+        return None, 0
+
+    score = (
+        weighted_total /
+        available_weight
+    )
+
+    return (
+        round(score, 1),
+        available_weight
+    )
+
+
+def environmental_severity(score):
+    """
+    Converts environmental condition into a stress/severity score.
+
+    Higher values mean greater environmental concern.
+    """
+
+    if score is None:
+        return None
+
+    if score >= 80:
+        return 0
+
+    if score >= 60:
+        return 25
+
+    if score >= 40:
+        return 60
+
+    return 100
+
+
+def priority_label(priority_score):
+    """
+    Translate the numerical priority score into an explainable category.
+    """
+
+    if priority_score is None:
+        return "Insufficient Data"
+
+    if priority_score >= 70:
+        return "Critical"
+
+    if priority_score >= 50:
+        return "High"
+
+    if priority_score >= 30:
+        return "Moderate"
+
+    return "Low"
+
+
+def confidence_label(confidence):
+    if confidence >= 80:
+        return "High"
+
+    if confidence >= 55:
+        return "Moderate"
+
+    return "Limited"
+
+
+def health_label(score):
+    if score is None:
+        return "Insufficient Data"
+
+    if score >= 85:
+        return "Excellent"
+
+    if score >= 70:
+        return "Strong"
+
+    if score >= 55:
+        return "Fair"
+
+    if score >= 40:
+        return "Needs Attention"
+
+    return "Poor"
+
+
+def calculate_priority_engine(grades):
+    """
+    EcoLens Environmental Priority Engine.
+
+    The engine produces:
+
+    - Forest Domain Score
+    - Surface Water Domain Score
+    - Environmental Health Score
+    - Environmental Stress Index
+    - Restoration Priority Score
+    - Priority Category
+    - Data Confidence
+    - Strongest Indicator
+    - Weakest Indicator
+
+    This is an experimental EcoLens decision-support metric
+    and is not an official Conservation Halton assessment.
+    """
+
+    # ========================================================
+    # FOREST DOMAIN
+    # ========================================================
+
+    forest_score, forest_coverage = weighted_domain_score(
+        grades,
+        FOREST_COMPONENT_WEIGHTS
+    )
+
+    # If no forest component information exists, allow the
+    # published overall forest grade to act as a fallback.
+    # Confidence is reduced because component-level evidence
+    # is unavailable.
+
+    if forest_score is None:
+
+        fallback_forest = environmental_grade_to_score(
+            grades.get("Forest Overall")
+        )
+
+        if fallback_forest is not None:
+            forest_score = fallback_forest
+            forest_coverage = 0.60
+
+    # ========================================================
+    # SURFACE WATER DOMAIN
+    # ========================================================
+
+    water_score, water_coverage = weighted_domain_score(
+        grades,
+        WATER_COMPONENT_WEIGHTS
+    )
+
+    if water_score is None:
+
+        fallback_water = environmental_grade_to_score(
+            grades.get("Water Quality Overall")
+        )
+
+        if fallback_water is not None:
+            water_score = fallback_water
+            water_coverage = 0.60
+
+    # ========================================================
+    # OVERALL ENVIRONMENTAL HEALTH
+    # ========================================================
+
+    available_domains = []
+
+    if forest_score is not None:
+        available_domains.append(
+            forest_score
+        )
+
+    if water_score is not None:
+        available_domains.append(
+            water_score
+        )
+
+    if not available_domains:
+
+        return {
+            "Forest Domain Score": None,
+            "Water Domain Score": None,
+            "Health Score": None,
+            "Health Label": "Insufficient Data",
+            "Stress Index": None,
+            "Priority Score": None,
+            "Priority Label": "Insufficient Data",
+            "Confidence": 0,
+            "Confidence Label": "Limited",
+            "Strongest Indicator": "No Data",
+            "Weakest Indicator": "No Data"
+        }
+
+    health_score = round(
+        sum(available_domains) /
+        len(available_domains),
+        1
+    )
+
+    # ========================================================
+    # DATA CONFIDENCE
+    # ========================================================
+
+    if (
+        forest_score is not None
+        and water_score is not None
+    ):
+
+        confidence = (
+            (
+                forest_coverage +
+                water_coverage
+            ) / 2
+        ) * 100
+
+    elif forest_score is not None:
+
+        confidence = (
+            forest_coverage *
+            0.50 *
+            100
+        )
+
+    else:
+
+        confidence = (
+            water_coverage *
+            0.50 *
+            100
+        )
+
+    confidence = round(
+        min(confidence, 100),
+        1
+    )
+
+    # ========================================================
+    # ENVIRONMENTAL STRESS INDEX
+    # ========================================================
+
+    stress_indicator_weights = {
+        "Forest Cover": 0.175,
+        "Forest Interior": 0.175,
+        "Forest Riparian": 0.150,
+        "Benthic": 0.200,
+        "E. coli": 0.150,
+        "Phosphorus": 0.150
+    }
+
+    stress_total = 0
+    stress_weight = 0
+
+    for indicator, weight in stress_indicator_weights.items():
+
+        score = environmental_grade_to_score(
+            grades.get(indicator)
+        )
+
+        severity = environmental_severity(
+            score
+        )
+
+        if severity is None:
+            continue
+
+        stress_total += severity * weight
+        stress_weight += weight
+
+    if stress_weight > 0:
+
+        stress_index = round(
+            stress_total /
+            stress_weight,
+            1
+        )
+
+    else:
+
+        stress_index = round(
+            environmental_severity(
+                health_score
+            ),
+            1
+        )
+
+    # ========================================================
+    # RESTORATION PRIORITY SCORE
+    # ========================================================
+    #
+    # 65% = overall environmental condition deficit
+    # 35% = concentration of poor indicator results
+    #
+    # This lets two watersheds with similar health scores have
+    # different priorities if one contains severe weak indicators.
+    # ========================================================
+
+    condition_deficit = (
+        100 -
+        health_score
+    )
+
+    restoration_priority = round(
+        (
+            condition_deficit * 0.65
+        )
+        +
+        (
+            stress_index * 0.35
+        ),
+        1
+    )
+
+    restoration_priority = max(
+        0,
+        min(
+            restoration_priority,
+            100
+        )
+    )
+
+    # ========================================================
+    # STRONGEST / WEAKEST INDICATOR
+    # ========================================================
+
+    indicator_scores = {}
+
+    for indicator in [
+        "Forest Cover",
+        "Forest Interior",
+        "Forest Riparian",
+        "Benthic",
+        "E. coli",
+        "Phosphorus"
+    ]:
+
+        score = environmental_grade_to_score(
+            grades.get(indicator)
+        )
+
+        if score is not None:
+            indicator_scores[indicator] = score
+
+    if indicator_scores:
+
+        strongest_indicator = max(
+            indicator_scores,
+            key=indicator_scores.get
+        )
+
+        weakest_indicator = min(
+            indicator_scores,
+            key=indicator_scores.get
+        )
+
+    else:
+
+        strongest_indicator = "No Data"
+        weakest_indicator = "No Data"
+
+    return {
+        "Forest Domain Score": (
+            round(forest_score, 1)
+            if forest_score is not None
+            else None
+        ),
+
+        "Water Domain Score": (
+            round(water_score, 1)
+            if water_score is not None
+            else None
+        ),
+
+        "Health Score": health_score,
+
+        "Health Label": health_label(
+            health_score
+        ),
+
+        "Stress Index": stress_index,
+
+        "Priority Score": restoration_priority,
+
+        "Priority Label": priority_label(
+            restoration_priority
+        ),
+
+        "Confidence": confidence,
+
+        "Confidence Label": confidence_label(
+            confidence
+        ),
+
+        "Strongest Indicator": strongest_indicator,
+
+        "Weakest Indicator": weakest_indicator
+    }
+
+def arcgis_properties_to_grades(properties):
+    """
+    Translate Conservation Halton ArcGIS property names into
+    standardized EcoLens indicator names.
+    """
+
+    return {
+        "Forest Overall":
+            properties.get("GRADE_FC_OVERALL"),
+
+        "Forest Cover":
+            properties.get("GRADE_FC_COVER"),
+
+        "Forest Interior":
+            properties.get("GRADE_FC_INTERIOR"),
+
+        "Forest Riparian":
+            properties.get("GRADE_FC_RIPARIAN"),
+
+        "Water Quality Overall":
+            properties.get("GRADE_SWQ_OVERALL"),
+
+        "Benthic":
+            properties.get("GRADE_SWQ_BENTHIC"),
+
+        "E. coli":
+            properties.get("GRADE_SWQ_ECOLI"),
+
+        "Phosphorus":
+            properties.get("GRADE_SWQ_PHOSPH")
+    }
+
+
+def enrich_geojson_with_ecolens_scores(geojson):
+    """
+    Run every watershed through the EcoLens Priority Engine
+    and attach the results to each GeoJSON feature.
+    """
+
+    scored_features = []
+
+    for feature in geojson.get("features", []):
+
+        properties = feature.get(
+            "properties",
+            {}
+        )
+
+        grades = arcgis_properties_to_grades(
+            properties
+        )
+
+        result = calculate_priority_engine(
+            grades
+        )
+
+        properties["ECOLENS_FOREST_SCORE"] = result[
+            "Forest Domain Score"
+        ]
+
+        properties["ECOLENS_WATER_SCORE"] = result[
+            "Water Domain Score"
+        ]
+
+        properties["ECOLENS_HEALTH_SCORE"] = result[
+            "Health Score"
+        ]
+
+        properties["ECOLENS_HEALTH_LABEL"] = result[
+            "Health Label"
+        ]
+
+        properties["ECOLENS_STRESS_INDEX"] = result[
+            "Stress Index"
+        ]
+
+        properties["ECOLENS_PRIORITY_SCORE"] = result[
+            "Priority Score"
+        ]
+
+        properties["ECOLENS_PRIORITY_LABEL"] = result[
+            "Priority Label"
+        ]
+
+        properties["ECOLENS_CONFIDENCE"] = result[
+            "Confidence"
+        ]
+
+        properties["ECOLENS_CONFIDENCE_LABEL"] = result[
+            "Confidence Label"
+        ]
+
+        properties["ECOLENS_STRONGEST_INDICATOR"] = result[
+            "Strongest Indicator"
+        ]
+
+        properties["ECOLENS_WEAKEST_INDICATOR"] = result[
+            "Weakest Indicator"
+        ]
+
+        if result["Priority Score"] is not None:
+            scored_features.append(feature)
+
+    scored_features.sort(
+        key=lambda feature:
+            feature["properties"].get(
+                "ECOLENS_PRIORITY_SCORE",
+                -1
+            ),
+        reverse=True
+    )
+
+    total_ranked = len(scored_features)
+
+    for rank, feature in enumerate(
+        scored_features,
+        start=1
+    ):
+
+        properties = feature["properties"]
+
+        properties["ECOLENS_PRIORITY_RANK"] = rank
+        properties["ECOLENS_TOTAL_RANKED"] = total_ranked
+
+        if total_ranked > 0:
+
+            percentile = round(
+                (
+                    total_ranked -
+                    rank +
+                    1
+                )
+                /
+                total_ranked
+                *
+                100
+            )
+
+        else:
+            percentile = None
+
+        properties[
+            "ECOLENS_PRIORITY_PERCENTILE"
+        ] = percentile
+
+    return geojson
 
 def safe_column(df, col_name):
     if col_name in df.columns:
@@ -393,17 +1049,60 @@ def build_chart_top_subwatersheds(top_df):
 # GEOJSON API FOR FUTURE INTERACTIVE MAP
 # ============================================================
 
+def simplify_coordinates(coords, tolerance=0.00008):
+    """
+    Reduces the number of coordinate points used to draw
+    watershed polygons in the browser.
+    """
+
+    if not coords:
+        return coords
+
+    if (
+        isinstance(coords, list)
+        and len(coords) > 0
+        and isinstance(coords[0], list)
+        and len(coords[0]) >= 2
+        and isinstance(coords[0][0], (int, float))
+    ):
+        simplified = [coords[0]]
+        last_point = coords[0]
+
+        for point in coords[1:-1]:
+            dx = point[0] - last_point[0]
+            dy = point[1] - last_point[1]
+
+            distance = math.sqrt(dx * dx + dy * dy)
+
+            if distance >= tolerance:
+                simplified.append(point)
+                last_point = point
+
+        if len(coords) > 1:
+            simplified.append(coords[-1])
+
+        return simplified
+
+    if isinstance(coords, list):
+        return [
+            simplify_coordinates(item, tolerance)
+            for item in coords
+        ]
+
+    return coords
+
+
 @app.route("/api/watersheds")
 def watershed_geojson():
-    """
-    Browser-accessible endpoint used by the future Leaflet map.
-
-    Example:
-        /api/watersheds
-    """
-
     try:
         geojson = fetch_live_geojson()
+
+        # Add EcoLens Priority Engine results
+        # to every watershed before sending it
+        # to the frontend.
+        geojson = enrich_geojson_with_ecolens_scores(
+            geojson
+        )
 
         return jsonify(geojson)
 
@@ -413,7 +1112,6 @@ def watershed_geojson():
             "error": "Live watershed geometry is currently unavailable.",
             "details": str(error)
         }), 503
-
 
 # ============================================================
 # MAIN DASHBOARD
@@ -1039,3 +1737,5 @@ if __name__ == "__main__":
         port=port,
         debug=True
     )
+
+    

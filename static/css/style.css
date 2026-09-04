@@ -389,8 +389,23 @@ button {
 
 .triple-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr 0.8fr;
-  gap: 24px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+  width: 100%;
+  align-items: stretch;
+  margin-bottom: 24px;
+}
+
+.triple-grid > .glass-card {
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+}
+
+@media (max-width: 1100px) {
+  .triple-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .dual-grid {
@@ -673,4 +688,985 @@ td {
   .stat-card {
     padding: 20px;
   }
+}
+
+/* ==========================================================
+   ECOLENS INTERACTIVE WATERSHED MAP
+   ========================================================== */
+
+
+.map-explorer-section {
+  padding-top: 55px;
+}
+
+
+.map-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 22px;
+  margin-bottom: 20px;
+}
+
+
+.map-search-wrap {
+  width: 100%;
+  max-width: 620px;
+}
+
+
+.map-search-wrap label {
+  display: block;
+  color: #a9bfd1;
+  margin-bottom: 9px;
+  font-size: 0.88rem;
+}
+
+
+.map-search-row {
+  display: flex;
+  gap: 10px;
+}
+
+
+.map-search-row input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.07);
+  color: white;
+  padding: 14px 16px;
+  border-radius: 14px;
+  outline: none;
+  font-size: 0.96rem;
+}
+
+
+.map-search-row input::placeholder {
+  color: #8295a5;
+}
+
+
+.map-search-row input:focus {
+  border-color: rgba(31,217,161,0.65);
+  box-shadow: 0 0 0 3px rgba(31,217,161,0.08);
+}
+
+
+.map-search-btn {
+  white-space: nowrap;
+}
+
+
+.live-status-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 230px;
+  padding: 13px 17px;
+  border-radius: 16px;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.12);
+  backdrop-filter: blur(18px);
+}
+
+
+.live-status-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: #8c9ba8;
+  flex-shrink: 0;
+}
+
+
+.status-loading {
+  background: #e6c84f;
+  box-shadow: 0 0 14px rgba(230,200,79,0.65);
+}
+
+
+.status-live {
+  background: #20d88c;
+  box-shadow: 0 0 14px rgba(32,216,140,0.7);
+}
+
+
+.status-error {
+  background: #e25353;
+  box-shadow: 0 0 14px rgba(226,83,83,0.7);
+}
+
+
+.live-status-label {
+  display: block;
+  color: #91a7b9;
+  font-size: 0.78rem;
+  margin-bottom: 3px;
+}
+
+
+.live-status-card strong {
+  font-size: 0.92rem;
+}
+
+
+.map-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.65fr) minmax(330px, 0.75fr);
+  gap: 24px;
+  align-items: stretch;
+}
+
+
+.map-card {
+  min-width: 0;
+}
+
+
+.map-panel-copy {
+  color: #a9bfd1;
+  margin-top: 7px;
+  line-height: 1.5;
+  font-size: 0.91rem;
+}
+
+
+#watershedMap {
+  width: 100%;
+  height: 650px;
+  border-radius: 20px;
+  overflow: hidden;
+  background: #0a1824;
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+
+/* Leaflet dark adaptation */
+
+.leaflet-container {
+  font-family: Arial, sans-serif;
+}
+
+
+.leaflet-control-zoom a {
+  background: #0b1a27 !important;
+  color: white !important;
+  border-color: rgba(255,255,255,0.12) !important;
+}
+
+
+.leaflet-control-attribution {
+  background: rgba(4,16,25,0.86) !important;
+  color: #a8bbc9 !important;
+}
+
+
+.leaflet-control-attribution a {
+  color: #7cebbf !important;
+}
+
+
+.leaflet-tooltip {
+  background: rgba(4,16,25,0.96);
+  color: white;
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 12px;
+  padding: 10px 12px;
+  box-shadow: 0 12px 30px rgba(0,0,0,0.35);
+}
+
+
+.leaflet-tooltip-top:before {
+  border-top-color: rgba(4,16,25,0.96);
+}
+
+
+.map-legend {
+  margin-top: 17px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(255,255,255,0.045);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+
+.legend-title {
+  display: block;
+  color: #a9bfd1;
+  font-size: 0.82rem;
+  margin-bottom: 10px;
+}
+
+
+.legend-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 13px 18px;
+}
+
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #d3dee7;
+  font-size: 0.82rem;
+}
+
+
+.legend-swatch {
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+}
+
+
+.legend-strong {
+  background: #20d88c;
+}
+
+
+.legend-moderate {
+  background: #e6c84f;
+}
+
+
+.legend-attention {
+  background: #f28b3c;
+}
+
+
+.legend-critical {
+  background: #e25353;
+}
+
+
+.legend-no-data {
+  background: #73808c;
+}
+
+
+/* ==========================================================
+   SELECTED WATERSHED PANEL
+   ========================================================== */
+
+
+.watershed-detail-card {
+  min-height: 650px;
+}
+
+
+.selected-watershed-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+
+.detail-eyebrow {
+  display: block;
+  color: #7cebbf;
+  text-transform: uppercase;
+  font-size: 0.73rem;
+  letter-spacing: 1.4px;
+  margin-bottom: 7px;
+}
+
+
+.selected-watershed-header h3 {
+  font-size: 1.45rem;
+  line-height: 1.25;
+}
+
+
+.priority-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 7px 11px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+
+.priority-neutral {
+  background: rgba(115,128,140,0.15);
+  border-color: rgba(115,128,140,0.35);
+  color: #b9c4cc;
+}
+
+
+.priority-low {
+  background: rgba(32,216,140,0.12);
+  border-color: rgba(32,216,140,0.32);
+  color: #8df5c9;
+}
+
+
+.priority-moderate {
+  background: rgba(230,200,79,0.12);
+  border-color: rgba(230,200,79,0.3);
+  color: #f0dc82;
+}
+
+
+.priority-high {
+  background: rgba(242,139,60,0.12);
+  border-color: rgba(242,139,60,0.3);
+  color: #ffb77e;
+}
+
+
+.priority-critical {
+  background: rgba(226,83,83,0.12);
+  border-color: rgba(226,83,83,0.3);
+  color: #ff9c9c;
+}
+
+
+.selected-watershed-description {
+  color: #b8c8d5;
+  line-height: 1.65;
+  margin-bottom: 18px;
+  font-size: 0.93rem;
+}
+
+
+.environment-score-card {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 18px;
+  border-radius: 18px;
+  background:
+    linear-gradient(
+      135deg,
+      rgba(31,217,161,0.12),
+      rgba(42,168,255,0.08)
+    );
+  border: 1px solid rgba(31,217,161,0.2);
+  margin-bottom: 18px;
+}
+
+
+.score-label {
+  display: block;
+  color: #a9bfd1;
+  font-size: 0.8rem;
+  margin-bottom: 7px;
+}
+
+
+.environment-score-card strong {
+  font-size: 2.5rem;
+  line-height: 1;
+}
+
+
+.score-scale {
+  color: #91a7b9;
+  padding-bottom: 4px;
+}
+
+
+.indicator-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+
+.indicator-card {
+  padding: 13px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.045);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+
+.indicator-card span {
+  display: block;
+  color: #94a9ba;
+  font-size: 0.76rem;
+  margin-bottom: 7px;
+}
+
+
+.indicator-card strong {
+  font-size: 1rem;
+}
+
+
+.grade-strong {
+  color: #7cebbf;
+}
+
+
+.grade-moderate {
+  color: #f0dc82;
+}
+
+
+.grade-attention {
+  color: #ffb77e;
+}
+
+
+.grade-critical {
+  color: #ff9c9c;
+}
+
+
+.grade-no-data {
+  color: #9aa8b2;
+  font-size: 0.83rem !important;
+}
+
+
+.selected-insight-box {
+  margin-top: 18px;
+  padding: 16px;
+  border-radius: 16px;
+  background: rgba(42,168,255,0.07);
+  border: 1px solid rgba(42,168,255,0.16);
+}
+
+
+.selected-insight-box p {
+  color: #d5e2ec;
+  line-height: 1.65;
+  font-size: 0.9rem;
+}
+
+
+.data-disclaimer {
+  margin-top: 16px;
+  color: #8295a5;
+  font-size: 0.77rem;
+  line-height: 1.55;
+}
+
+
+/* ==========================================================
+   RESPONSIVE MAP
+   ========================================================== */
+
+
+@media (max-width: 1100px) {
+
+  .map-layout {
+    grid-template-columns: 1fr;
+  }
+
+
+  .watershed-detail-card {
+    min-height: unset;
+  }
+
+}
+
+
+@media (max-width: 760px) {
+
+  .map-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+
+  .live-status-card {
+    width: 100%;
+  }
+
+
+  .map-search-row {
+    flex-direction: column;
+  }
+
+
+  .map-search-btn {
+    width: 100%;
+  }
+
+
+  #watershedMap {
+    height: 480px;
+  }
+
+
+  .indicator-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+
+  .selected-watershed-header {
+    flex-direction: column;
+  }
+
+}
+
+
+@media (max-width: 470px) {
+
+  #watershedMap {
+    height: 420px;
+  }
+
+
+  .indicator-grid {
+    grid-template-columns: 1fr;
+  }
+
+}
+
+/* ==========================================================
+   CUSTOM WATERSHED SEARCH DROPDOWN
+   ========================================================== */
+
+.watershed-search-wrapper {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+
+.watershed-search-wrapper input {
+  width: 100%;
+}
+
+
+.watershed-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+
+  display: none;
+
+  max-height: 320px;
+  overflow-y: auto;
+
+  background: rgba(9, 29, 43, 0.97);
+  border: 1px solid rgba(124, 235, 191, 0.22);
+  border-radius: 16px;
+
+  box-shadow:
+    0 20px 50px rgba(0, 0, 0, 0.45);
+
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+
+  z-index: 9999;
+
+  padding: 8px;
+}
+
+
+.watershed-dropdown.show {
+  display: block;
+}
+
+
+.watershed-dropdown-item {
+  display: block;
+
+  width: 100%;
+
+  padding: 11px 13px;
+
+  border: none;
+  border-radius: 10px;
+
+  background: transparent;
+  color: #dfeaf2;
+
+  text-align: left;
+
+  font-size: 0.9rem;
+
+  cursor: pointer;
+
+  transition:
+    background 0.18s ease,
+    color 0.18s ease,
+    transform 0.18s ease;
+}
+
+
+.watershed-dropdown-item:hover {
+  background: rgba(31, 217, 161, 0.12);
+  color: #8df5c9;
+  transform: translateX(2px);
+}
+
+
+.watershed-dropdown-empty {
+  padding: 13px;
+
+  color: #8295a5;
+
+  font-size: 0.88rem;
+
+  text-align: center;
+}
+
+
+.watershed-dropdown::-webkit-scrollbar {
+  width: 8px;
+}
+
+
+.watershed-dropdown::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+
+.watershed-dropdown::-webkit-scrollbar-thumb {
+  background: rgba(124, 235, 191, 0.25);
+  border-radius: 999px;
+}
+
+
+.watershed-dropdown::-webkit-scrollbar-thumb:hover {
+  background: rgba(124, 235, 191, 0.4);
+}
+
+.map-toolbar {
+  position: relative;
+  z-index: 10000;
+}
+
+.map-search-wrap {
+  position: relative;
+  z-index: 10001;
+}
+
+.watershed-search-wrapper {
+  position: relative;
+  z-index: 10002;
+}
+
+.watershed-dropdown {
+  z-index: 10003;
+}
+
+.map-layout {
+  position: relative;
+  z-index: 1;
+}
+
+.pattern-balance-card {
+  padding: 18px;
+  border-radius: 18px;
+  background: rgba(255,255,255,0.045);
+  border: 1px solid rgba(255,255,255,0.08);
+  margin-bottom: 16px;
+}
+
+.pattern-balance-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.pattern-kicker {
+  display: block;
+  color: #9cb2c5;
+  font-size: 0.78rem;
+  margin-bottom: 6px;
+}
+
+.pattern-balance-header strong {
+  font-size: 1.05rem;
+}
+
+.pattern-gap-badge {
+  padding: 7px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  color: #dff8ee;
+  background: rgba(25, 195, 125, 0.12);
+  border: 1px solid rgba(25, 195, 125, 0.28);
+  white-space: nowrap;
+}
+
+.domain-row {
+  margin-bottom: 16px;
+}
+
+.domain-row-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 7px;
+  color: #d8e5ef;
+  font-size: 0.9rem;
+}
+
+.domain-track {
+  width: 100%;
+  height: 9px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255,255,255,0.08);
+}
+
+.domain-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: inherit;
+  transition: width 0.45s ease;
+}
+
+.domain-fill-forest {
+  background: linear-gradient(
+    90deg,
+    #19c37d,
+    #50e3a4
+  );
+}
+
+.domain-fill-water {
+  background: linear-gradient(
+    90deg,
+    #2aa8ff,
+    #5bc8ff
+  );
+}
+
+.pattern-explanation {
+  color: #c8d8e5;
+  line-height: 1.6;
+  font-size: 0.9rem;
+  margin-top: 8px;
+}
+
+.pattern-signal-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.pattern-signal-card {
+  padding: 16px;
+  border-radius: 16px;
+  background: rgba(255,255,255,0.045);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.pattern-signal-card strong {
+  display: block;
+  font-size: 1rem;
+  margin-bottom: 7px;
+}
+
+.pattern-positive {
+  border-color: rgba(25, 195, 125, 0.2);
+  background: rgba(25, 195, 125, 0.06);
+}
+
+.pattern-warning {
+  border-color: rgba(242, 139, 60, 0.22);
+  background: rgba(242, 139, 60, 0.06);
+}
+
+.pattern-grade {
+  color: #b7c9d8;
+  font-size: 0.84rem;
+}
+
+@media (max-width: 700px) {
+  .pattern-signal-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ============================================================
+   MAIN WATERSHED ANALYSIS GRID
+   ============================================================ */
+
+.dashboard-main-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  width: 100%;
+  margin-bottom: 24px;
+  align-items: stretch;
+}
+
+.dashboard-main-grid > .glass-card {
+  width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 950px) {
+  .dashboard-main-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ============================================================
+   TOP PERFORMING WATERSHEDS
+   ============================================================ */
+
+.top-areas-subtitle {
+  color: #9fb4c6;
+  font-size: 0.86rem;
+  margin-top: 6px;
+}
+
+.metric-selector-wrap {
+  margin-bottom: 14px;
+}
+
+.metric-selector-wrap label {
+  display: block;
+  color: #9fb4c6;
+  font-size: 0.8rem;
+  margin-bottom: 7px;
+}
+
+.metric-selector-wrap select {
+  width: 100%;
+  padding: 11px 13px;
+
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.12);
+
+  background: #172b3d;
+  color: #f4f8fb;
+
+  font-size: 0.9rem;
+  cursor: pointer;
+
+  outline: none;
+}
+
+.metric-selector-wrap select:focus {
+  border-color: rgba(25,195,125,0.65);
+}
+
+/* ============================================================
+   WATERSHED COMPARISON
+   ============================================================ */
+
+.comparison-subtitle {
+  margin-top: 6px;
+  color: #9fb4c6;
+  font-size: 0.84rem;
+}
+
+.comparison-item {
+  padding: 14px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+
+.comparison-item:last-of-type {
+  border-bottom: none;
+}
+
+.comparison-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.comparison-heading span {
+  color: #dce8f2;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.comparison-heading strong {
+  color: #7de7c0;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.comparison-values {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 9px;
+  color: #9fb4c6;
+  font-size: 0.75rem;
+}
+
+.comparison-values strong {
+  color: #f5f9fc;
+  margin-left: 5px;
+}
+
+.comparison-track {
+  position: relative;
+  height: 9px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.08);
+  overflow: hidden;
+}
+
+.comparison-selected-bar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    #19c37d,
+    #48d8a2
+  );
+  transition: width 0.45s ease;
+}
+
+.comparison-average-marker {
+  position: absolute;
+  top: -3px;
+  width: 2px;
+  height: 15px;
+  background: #ffffff;
+  opacity: 0.8;
+  z-index: 2;
+  left: 0%;
+  transition: left 0.45s ease;
+}
+
+.comparison-priority {
+  margin-top: 18px;
+  padding: 15px;
+  border-radius: 14px;
+  background: rgba(42,168,255,0.07);
+  border: 1px solid rgba(42,168,255,0.18);
+}
+
+.comparison-kicker {
+  display: block;
+  color: #8eb8d5;
+  font-size: 0.75rem;
+  margin-bottom: 6px;
+}
+
+.comparison-priority strong {
+  display: block;
+  color: #f5f9fc;
+  font-size: 1rem;
+  margin-bottom: 5px;
+}
+
+.comparison-priority p {
+  color: #b8cad8;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  margin: 0;
 }
