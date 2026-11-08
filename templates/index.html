@@ -207,6 +207,108 @@
     </section>
 
 
+    <!-- ===================================================== -->
+    <!-- METHODOLOGY -->
+    <!-- ===================================================== -->
+
+    <section class="section" id="method">
+
+      <div class="section-head">
+        <p class="eyebrow">Methodology</p>
+        <h2>From report-card grades to a restoration priority</h2>
+        <p class="section-copy">
+          Every number in EcoLens is calculated in Python with fixed,
+          published rules. Nothing is estimated by AI. The values below
+          are read directly from the scoring engine.
+        </p>
+      </div>
+
+      <ol class="pipeline">
+
+        <li class="step">
+          <span class="step-num">1</span>
+          <h3>Grades become scores</h3>
+          <p>Each published letter grade is converted to a 0–100 score.</p>
+          <div class="grade-scale">
+            {% for grade, score in engine_config.grade_map.items() %}
+              <span class="grade-cell" data-score="{{ score }}">
+                <strong>{{ grade }}</strong>
+                <em>{{ score }}</em>
+              </span>
+            {% endfor %}
+          </div>
+        </li>
+
+        <li class="step">
+          <span class="step-num">2</span>
+          <h3>Two condition domains</h3>
+          <p>Indicators are combined with fixed weights. Unreported indicators are excluded and the remaining weights are re-normalised.</p>
+          <div class="weights">
+            <div>
+              <h4>Forest</h4>
+              {% for name, weight in engine_config.forest_weights.items() %}
+                <div class="weight-row"><span>{{ name }}</span><b>{{ '%g'|format((weight * 100)|round(1)) }}%</b></div>
+              {% endfor %}
+            </div>
+            <div>
+              <h4>Surface water</h4>
+              {% for name, weight in engine_config.water_weights.items() %}
+                <div class="weight-row"><span>{{ name }}</span><b>{{ '%g'|format((weight * 100)|round(1)) }}%</b></div>
+              {% endfor %}
+            </div>
+          </div>
+        </li>
+
+        <li class="step">
+          <span class="step-num">3</span>
+          <h3>Environmental health</h3>
+          <p>The average of the available domain scores.</p>
+          <code class="formula">Health = mean(Forest, Surface water)</code>
+          <p class="step-note">If no component grades exist, the published overall grade is used and evidence coverage drops to {{ engine_config.fallback_coverage }}%.</p>
+        </li>
+
+        <li class="step">
+          <span class="step-num">4</span>
+          <h3>Stress index</h3>
+          <p>Each component score becomes a severity (≥80 → 0, ≥60 → 25, ≥40 → 60, below 40 → 100), then a weighted average.</p>
+          <div class="weights single">
+            {% for name, weight in engine_config.stress_weights.items() %}
+              <div class="weight-row"><span>{{ name }}</span><b>{{ '%g'|format((weight * 100)|round(1)) }}%</b></div>
+            {% endfor %}
+          </div>
+        </li>
+
+        <li class="step step-wide">
+          <span class="step-num">5</span>
+          <h3>Restoration priority</h3>
+          <p>Poor overall condition matters most; concentrated severe indicators raise priority further.</p>
+          <code class="formula">
+            Priority = {{ engine_config.condition_weight }} × (100 − Health) + {{ engine_config.stress_weight }} × Stress
+          </code>
+          <div class="threshold-row">
+            {% for label, minimum in engine_config.priority_thresholds.items() %}
+              <span class="threshold" data-priority="{{ label }}">
+                <i aria-hidden="true"></i>{{ label }} <b>≥ {{ minimum }}</b>
+              </span>
+            {% endfor %}
+          </div>
+        </li>
+
+      </ol>
+
+      <div class="limits">
+        <h3>What these scores can and cannot tell you</h3>
+        <ul>
+          <li><b>Grades, not measurements.</b> Inputs are Conservation Halton's published letter grades, not raw sensor data. The source data is the 2023 report card, not real-time readings.</li>
+          <li><b>Weights are assumptions.</b> The grade-to-score values, weights and thresholds are EcoLens design choices, shown in full above so they can be challenged.</li>
+          <li><b>Evidence coverage is not statistical confidence.</b> It measures how much of each domain's indicator weight was actually reported.</li>
+          <li><b>Decision support only.</b> Rankings are a starting point for discussion and field review, not an official assessment.</li>
+        </ul>
+      </div>
+
+    </section>
+
+
   </main>
 
 
