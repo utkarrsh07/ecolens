@@ -13,6 +13,10 @@ from urllib.parse import urlencode
 
 app = Flask(__name__)
 
+# Never pretty-print JSON. With debug=True Flask indents every response,
+# which made the watershed GeoJSON roughly 3-4x larger than necessary.
+app.json.compact = True
+
 
 # ============================================================
 # ECOLENS DATA CONFIGURATION
