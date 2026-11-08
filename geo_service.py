@@ -361,3 +361,40 @@ def simplify_feature_collection(geojson, tolerance_metres=SIMPLIFY_TOLERANCE_MET
     return before, after
 
 
+# ============================================================
+# 3. SNAPSHOT (offline fallback)
+# ============================================================
+
+def write_snapshot(geojson):
+    """
+    Save the simplified (unscored) GeoJSON so EcoLens still works if ArcGIS is
+    unavailable. Works locally; silently skipped on read-only hosts (Vercel).
+    """
+
+    try:
+        temporary = SNAPSHOT_PATH + ".tmp"
+        with open(temporary, "w", encoding="utf-8") as handle:
+            json.dump(geojson, handle, separators=(",", ":"))
+        os.replace(temporary, SNAPSHOT_PATH)
+        return True
+    except OSError:
+        return False
+
+
+def read_snapshot():
+    with open(SNAPSHOT_PATH, "r", encoding="utf-8") as handle:
+        geojson = json.load(handle)
+
+    validate_feature_collection(geojson)
+    return geojson
+
+
+def snapshot_age_text():
+    try:
+        modified = os.path.getmtime(SNAPSHOT_PATH)
+    except OSError:
+        return None
+
+    return time.strftime("%Y-%m-%d %H:%M", time.localtime(modified))
+
+
