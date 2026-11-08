@@ -12,11 +12,11 @@
   >
 
   <!-- Leaflet map CSS -->
+  <!-- Bundled locally (static/vendor/leaflet). The old CDN link had an
+       incorrect integrity hash, so browsers refused to load this CSS. -->
   <link
     rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    integrity="sha256-p4NxAoJBhIINfQ3KZQv6v4prH1lgyJc0l87x4U8hYfI="
-    crossorigin=""
+    href="{{ url_for('static', filename='vendor/leaflet/leaflet.css') }}"
   >
 </head>
 
@@ -1617,10 +1617,8 @@
 
 
   <!-- Leaflet -->
- <script
-  src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-  integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-  crossorigin=""
+<script
+  src="{{ url_for('static', filename='vendor/leaflet/leaflet.js') }}"
 ></script>
 
 <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
