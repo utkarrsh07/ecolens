@@ -1057,4 +1057,265 @@
     animateGauges(panel);
   }
 
+  // --------------------------------------------------------
+  // PROFILE: SIGNALS (rule-based, explainable)
+  // --------------------------------------------------------
+
+  function buildSignals(feature) {
+    const p = props(feature);
+    const signals = [];
+
+    const forest = p.ECOLENS_FOREST_SCORE;
+    const water = p.ECOLENS_WATER_SCORE;
+
+    if (isNum(forest) && isNum(water) && Math.abs(forest - water) >= 15) {
+      const forestBetter = forest > water;
+      signals.push({
+        type: "warn",
+        icon: "≠",
+        html: `<b>${forestBetter ? "Forest condition outperforms surface water" : "Surface water outperforms forest condition"}</b>
+          by ${Math.round(Math.abs(forest - water))} points (${fmt(forest)} vs ${fmt(water)}).`
+      });
+    }
+
+    const cover = indicator(feature, "Forest Cover");
+    const riparian = indicator(feature, "Forest Riparian");
+    const interior = indicator(feature, "Forest Interior");
+
+    if (isNum(cover.score) && isNum(riparian.score) && cover.score - riparian.score >= 20) {
+      signals.push({
+        type: "warn",
+        icon: "↓",
+        html: `<b>Riparian forest (${escapeHtml(riparian.grade)}) is much weaker than forest cover (${escapeHtml(cover.grade)}).</b>
+          Forest along the stream banks is in worse condition than forest in the watershed overall.`
+      });
+    }
+
+    if (isNum(cover.score) && isNum(interior.score) && cover.score >= 80 && interior.score < 40) {
+      signals.push({
+        type: "info",
+        icon: "◇",
+        html: `<b>Forest cover is ${escapeHtml(cover.grade)} but forest interior is ${escapeHtml(interior.grade)}.</b>
+          There is a lot of forest but little deep interior habitat, which usually means the forest is broken into smaller patches.`
+      });
+    }
+
+    if (p.ECOLENS_WATER_BASIS === "none") {
+      signals.push({
+        type: "gap",
+        icon: "!",
+        html: `<b>No surface-water grades were published.</b> Environmental health here reflects forest conditions only.`
+      });
+    } else {
+      const missing = WATER_COMPONENTS.filter((name) => !isNum(indicator(feature, name).score));
+      if (missing.length) {
+        signals.push({
+          type: "gap",
+          icon: "?",
+          html: `<b>Not reported:</b> ${missing.map((n) => escapeHtml(INDICATOR_LABELS[n])).join(", ")}.
+            The surface-water score uses the remaining ${p.ECOLENS_WATER_COVERAGE}% of its indicator weight.`
+        });
+      }
+    }
+
+    const components = FOREST_COMPONENTS.concat(WATER_COMPONENTS)
+      .map((name) => indicator(feature, name))
+      .filter((item) => isNum(item.score));
+
+    const weak = components.filter((item) => item.score < 60).length;
+
+    if (components.length && weak === 0) {
+      signals.push({
+        type: "good",
+        icon: "✓",
+        html: `<b>All ${components.length} reported component indicators are graded C or better.</b>`
+      });
+    } else if (components.length && weak >= Math.ceil(components.length / 2)) {
+      signals.push({
+        type: "warn",
+        icon: "▲",
+        html: `<b>${weak} of ${components.length} reported indicators are graded D or F</b>, which drives the stress index to ${fmt(p.ECOLENS_STRESS_INDEX)}.`
+      });
+    }
+
+    return signals.slice(0, 4);
+  }
+
+  // --------------------------------------------------------
+  // PROFILE: INTERPRETATION (deterministic text from facts)
+  // --------------------------------------------------------
+
+  function conditionWord(value) {
+    const bin = conditionBin(value);
+    return bin ? bin.label.toLowerCase() : "unknown";
+  }
+
+  function interpretation(feature, mode) {
+    const p = props(feature);
+    const r = state.region;
+    const name = `<b>${escapeHtml(nameOf(feature))}</b>`;
+    const rank = p.ECOLENS_PRIORITY_RANK;
+    const total = p.ECOLENS_TOTAL_RANKED;
+    const weakest = INDICATOR_LABELS[p.ECOLENS_WEAKEST_INDICATOR] || p.ECOLENS_WEAKEST_INDICATOR;
+    const strongest = INDICATOR_LABELS[p.ECOLENS_STRONGEST_INDICATOR] || p.ECOLENS_STRONGEST_INDICATOR;
+    const weakestGrade = indicator(feature, p.ECOLENS_WEAKEST_INDICATOR).grade;
+    const strongestGrade = indicator(feature, p.ECOLENS_STRONGEST_INDICATOR).grade;
+    const hasWater = isNum(p.ECOLENS_WATER_SCORE);
+
+    if (!isNum(p.ECOLENS_HEALTH_SCORE)) {
+      return `${name} does not have enough published grades for EcoLens to calculate a score.`;
+    }
+
+    if (mode === "public") {
+      const higherCount = isNum(rank) ? rank - 1 : null;
+      return `
+        Overall, the environment in ${name} is in <b>${conditionWord(p.ECOLENS_HEALTH_SCORE)}</b> condition
+        (${fmt(p.ECOLENS_HEALTH_SCORE)} out of 100).
+        Its forests score ${fmt(p.ECOLENS_FOREST_SCORE)}
+        ${hasWater ? `and its streams score ${fmt(p.ECOLENS_WATER_SCORE)}` : "— stream water quality was not graded in 2023"}.
+        The best result is <b>${escapeHtml(strongest)}</b> (grade ${escapeHtml(strongestGrade || "—")});
+        the weakest is <b>${escapeHtml(weakest)}</b> (grade ${escapeHtml(weakestGrade || "—")}).
+        ${higherCount !== null ? `Of the ${total} watersheds EcoLens compared, ${higherCount === 0 ? "none is" : higherCount + (higherCount === 1 ? " is" : " are")} a higher restoration priority.` : ""}
+      `;
+    }
+
+    if (mode === "policy") {
+      const gap = p.ECOLENS_WATER_BASIS === "none"
+        ? "Surface-water monitoring results are not available here, so investment decisions would benefit from field data first."
+        : (p.ECOLENS_CONFIDENCE < 70
+          ? `Evidence coverage is ${fmt(p.ECOLENS_CONFIDENCE)}%, so findings should be confirmed against additional monitoring.`
+          : `Evidence coverage is ${fmt(p.ECOLENS_CONFIDENCE)}%, so the score is based on most of the published indicators.`);
+
+      return `
+        ${name} is a <b>${escapeHtml(p.ECOLENS_PRIORITY_LABEL)}</b> restoration priority
+        (rank ${rank} of ${total}, score ${fmt(p.ECOLENS_PRIORITY_SCORE)}).
+        The weakest published indicator is <b>${escapeHtml(weakest)}</b> (grade ${escapeHtml(weakestGrade || "—")}),
+        and it pulls the score down the most.
+        ${gap}
+        This ranking is an experimental EcoLens metric meant to support discussion, not an official assessment.
+      `;
+    }
+
+    // analyst (default)
+    return `
+      ${name}: health <b>${fmt(p.ECOLENS_HEALTH_SCORE, 1)}</b>
+      (forest ${fmt(p.ECOLENS_FOREST_SCORE, 1)}, surface water ${hasWater ? fmt(p.ECOLENS_WATER_SCORE, 1) : "n/a"};
+      regional means ${fmt(r.forest, 1)} / ${fmt(r.water, 1)}).
+      Stress index <b>${fmt(p.ECOLENS_STRESS_INDEX, 1)}</b> vs regional mean ${fmt(r.stress, 1)}.
+      Restoration priority <b>${fmt(p.ECOLENS_PRIORITY_SCORE, 1)}</b> → ${escapeHtml(p.ECOLENS_PRIORITY_LABEL)},
+      rank ${rank}/${total}.
+      Evidence coverage ${fmt(p.ECOLENS_CONFIDENCE)}%
+      (forest ${p.ECOLENS_FOREST_COVERAGE}% via ${escapeHtml(p.ECOLENS_FOREST_BASIS)},
+      water ${p.ECOLENS_WATER_COVERAGE}% via ${escapeHtml(p.ECOLENS_WATER_BASIS)}).
+    `;
+  }
+
+  // --------------------------------------------------------
+  // PROFILE: CALCULATION BREAKDOWN (the actual arithmetic)
+  // --------------------------------------------------------
+
+  function domainLine(feature, components, weights, basis, overallName, result) {
+    if (basis === "none") {
+      return `<div class="calc-line">No grades reported → excluded</div>`;
+    }
+
+    if (basis === "overall grade") {
+      const overall = indicator(feature, overallName);
+      return `
+        <div class="calc-line">No component grades → published overall grade
+          ${escapeHtml(overall.grade)} = <b>${fmt(result, 1)}</b></div>
+        <div class="calc-note">Evidence coverage for this domain is capped at ${ENGINE.fallback_coverage || 60}%.</div>
+      `;
+    }
+
+    const used = components.filter((name) => isNum(indicator(feature, name).score));
+    const skipped = components.filter((name) => !used.includes(name));
+    const weightSum = used.reduce((sum, name) => sum + (weights[name] || 0), 0);
+
+    const terms = used
+      .map((name) => `${INDICATOR_LABELS[name]} ${indicator(feature, name).score}×${weights[name]}`)
+      .join(" + ");
+
+    return `
+      <div class="calc-line">(${escapeHtml(terms)}) ÷ ${weightSum.toFixed(2)} = <b>${fmt(result, 1)}</b></div>
+      ${skipped.length ? `<div class="calc-note">Not reported, weight re-normalised: ${skipped.map((n) => escapeHtml(INDICATOR_LABELS[n])).join(", ")}</div>` : ""}
+    `;
+  }
+
+  function calculationHtml(feature) {
+    const p = props(feature);
+
+    const forestLine = domainLine(
+      feature, FOREST_COMPONENTS, ENGINE.forest_weights,
+      p.ECOLENS_FOREST_BASIS, "Forest Overall", p.ECOLENS_FOREST_SCORE
+    );
+
+    const waterLine = domainLine(
+      feature, WATER_COMPONENTS, ENGINE.water_weights,
+      p.ECOLENS_WATER_BASIS, "Water Quality Overall", p.ECOLENS_WATER_SCORE
+    );
+
+    const domains = [p.ECOLENS_FOREST_SCORE, p.ECOLENS_WATER_SCORE].filter(isNum);
+    const healthLine = domains.length === 2
+      ? `(${fmt(p.ECOLENS_FOREST_SCORE, 1)} + ${fmt(p.ECOLENS_WATER_SCORE, 1)}) ÷ 2 = <b>${fmt(p.ECOLENS_HEALTH_SCORE, 1)}</b>`
+      : `Only one domain available → <b>${fmt(p.ECOLENS_HEALTH_SCORE, 1)}</b>`;
+
+    const stressWeights = ENGINE.stress_weights || {};
+    const stressTerms = Object.keys(stressWeights)
+      .filter((name) => isNum(indicator(feature, name).severity))
+      .map((name) => `${INDICATOR_LABELS[name]} ${indicator(feature, name).severity}×${stressWeights[name]}`);
+
+    const stressWeightSum = Object.keys(stressWeights)
+      .filter((name) => isNum(indicator(feature, name).severity))
+      .reduce((sum, name) => sum + stressWeights[name], 0);
+
+    const stressLine = stressTerms.length
+      ? `(${escapeHtml(stressTerms.join(" + "))}) ÷ ${stressWeightSum.toFixed(3)} = <b>${fmt(p.ECOLENS_STRESS_INDEX, 1)}</b>`
+      : `No component grades → severity of the health score = <b>${fmt(p.ECOLENS_STRESS_INDEX, 1)}</b>`;
+
+    const cw = ENGINE.condition_weight;
+    const sw = ENGINE.stress_weight;
+    const thresholds = ENGINE.priority_thresholds || {};
+    const label = p.ECOLENS_PRIORITY_LABEL;
+
+    const coverageLine = domains.length === 2
+      ? `(${p.ECOLENS_FOREST_COVERAGE}% + ${p.ECOLENS_WATER_COVERAGE}%) ÷ 2 = <b>${fmt(p.ECOLENS_CONFIDENCE)}%</b>`
+      : `Single domain (${isNum(p.ECOLENS_FOREST_SCORE) ? p.ECOLENS_FOREST_COVERAGE : p.ECOLENS_WATER_COVERAGE}%) × 0.5 = <b>${fmt(p.ECOLENS_CONFIDENCE)}%</b>`;
+
+    return `
+      <details class="calc">
+        <summary>How this score was calculated</summary>
+        <div class="calc-body">
+          <div class="calc-step">
+            <h4>1 · Forest domain</h4>
+            ${forestLine}
+          </div>
+          <div class="calc-step">
+            <h4>2 · Surface-water domain</h4>
+            ${waterLine}
+          </div>
+          <div class="calc-step">
+            <h4>3 · Environmental health</h4>
+            <div class="calc-line">${healthLine}</div>
+          </div>
+          <div class="calc-step">
+            <h4>4 · Stress index</h4>
+            <div class="calc-line">${stressLine}</div>
+            <div class="calc-note">Severity: score ≥80 → 0, ≥60 → 25, ≥40 → 60, below 40 → 100</div>
+          </div>
+          <div class="calc-step">
+            <h4>5 · Restoration priority</h4>
+            <div class="calc-line">${cw} × (100 − ${fmt(p.ECOLENS_HEALTH_SCORE, 1)}) + ${sw} × ${fmt(p.ECOLENS_STRESS_INDEX, 1)} = <b>${fmt(p.ECOLENS_PRIORITY_SCORE, 1)}</b></div>
+            <div class="calc-note">${escapeHtml(label)}${isNum(thresholds[label]) ? ` (≥ ${thresholds[label]})` : ""}</div>
+          </div>
+          <div class="calc-step">
+            <h4>6 · Evidence coverage</h4>
+            <div class="calc-line">${coverageLine}</div>
+          </div>
+          <div class="calc-note">All values are produced by the EcoLens Python engine; this panel only displays them.</div>
+        </div>
+      </details>
+    `;
+  }
+
 })();
