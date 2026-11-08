@@ -854,4 +854,207 @@
     return false;
   }
 
+  // --------------------------------------------------------
+  // PROFILE: SHARED PIECES
+  // --------------------------------------------------------
+
+  function gaugeSvg(value, color) {
+    const radius = 52;
+    const circumference = 2 * Math.PI * radius;
+    const fraction = isNum(value) ? Math.max(0, Math.min(100, Number(value))) / 100 : 0;
+
+    return `
+      <svg viewBox="0 0 128 128" aria-hidden="true">
+        <circle class="gauge-track" cx="64" cy="64" r="${radius}" fill="none" stroke-width="11"></circle>
+        <circle class="gauge-fill" cx="64" cy="64" r="${radius}" fill="none"
+          stroke="${color}" stroke-width="11" stroke-linecap="round"
+          stroke-dasharray="${circumference.toFixed(2)}"
+          stroke-dashoffset="${circumference.toFixed(2)}"
+          data-target="${(circumference * (1 - fraction)).toFixed(2)}"></circle>
+      </svg>
+    `;
+  }
+
+  function animateGauges(root) {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        root.querySelectorAll(".gauge-fill").forEach((circle) => {
+          circle.style.strokeDashoffset = circle.dataset.target;
+        });
+      });
+    });
+  }
+
+  function metricRow(options) {
+    const { label, value, average, color, foot, suffix } = options;
+
+    if (!isNum(value)) {
+      return `
+        <div class="metric-row">
+          <div class="metric-head">
+            <span>${escapeHtml(label)}</span>
+            <span class="metric-value">Not reported</span>
+          </div>
+          <div class="metric-track"></div>
+          ${foot ? `<div class="metric-foot">${foot}</div>` : ""}
+        </div>
+      `;
+    }
+
+    const width = Math.max(2, Math.min(100, Number(value)));
+    const avgLeft = isNum(average) ? Math.max(0, Math.min(100, Number(average))) : null;
+
+    return `
+      <div class="metric-row">
+        <div class="metric-head">
+          <span>${escapeHtml(label)}</span>
+          <span class="metric-value">${fmt(value)}<small>${suffix || "/100"}</small></span>
+        </div>
+        <div class="metric-track">
+          <i style="width:${width}%;background:${color}"></i>
+          ${avgLeft !== null ? `<b style="left:calc(${avgLeft}% - 1px)" title="Regional average ${fmt(average)}"></b>` : ""}
+        </div>
+        ${foot ? `<div class="metric-foot">${foot}</div>` : ""}
+      </div>
+    `;
+  }
+
+  function versusAverage(value, average, higherIsWorse) {
+    if (!isNum(value) || !isNum(average)) return "";
+    const diff = Number(value) - Number(average);
+    const rounded = Math.round(Math.abs(diff));
+
+    if (rounded === 0) return `Regional average ${fmt(average)} · in line with the region`;
+
+    const better = higherIsWorse ? diff < 0 : diff > 0;
+    return `Regional average ${fmt(average)} · ${rounded} points ${diff > 0 ? "above" : "below"}` +
+      ` (${better ? "better" : "worse"} than average)`;
+  }
+
+  // --------------------------------------------------------
+  // PROFILE: REGIONAL OVERVIEW (nothing selected)
+  // --------------------------------------------------------
+
+  function renderOverview() {
+    const r = state.region;
+    const healthBin = conditionBin(r.health) || CONDITION_BINS[2];
+    const attention = r.priorityCounts.Critical + r.priorityCounts.High;
+
+    const totalRanked = PRIORITY_ORDER.reduce((sum, label) => sum + r.priorityCounts[label], 0) || 1;
+
+    const stack = PRIORITY_ORDER
+      .filter((label) => r.priorityCounts[label] > 0)
+      .map((label) => `<i style="flex:${r.priorityCounts[label]};background:${PRIORITY_COLORS[label]}" title="${label}: ${r.priorityCounts[label]}"></i>`)
+      .join("");
+
+    const stackLegend = PRIORITY_ORDER.map((label) => `
+      <button type="button" data-filter="${label}">
+        <span class="swatch" style="background:${PRIORITY_COLORS[label]}"></span>
+        ${label}
+        <b>${r.priorityCounts[label]}</b>
+      </button>
+    `).join("");
+
+    const top = state.features
+      .filter((f) => isNum(props(f).ECOLENS_PRIORITY_RANK))
+      .sort((a, b) => props(a).ECOLENS_PRIORITY_RANK - props(b).ECOLENS_PRIORITY_RANK)
+      .slice(0, 5)
+      .map((f) => `
+        <li>
+          <button type="button" data-id="${f.__id}">
+            <span class="rank-pos">#${props(f).ECOLENS_PRIORITY_RANK}</span>
+            <span>${escapeHtml(nameOf(f))}</span>
+            <em>
+              <span class="swatch" style="background:${PRIORITY_COLORS[props(f).ECOLENS_PRIORITY_LABEL] || COLORS.missing}"></span>
+              ${fmt(props(f).ECOLENS_PRIORITY_SCORE)}
+            </em>
+          </button>
+        </li>
+      `).join("");
+
+    const forestBin = conditionBin(r.forest);
+    const waterBin = conditionBin(r.water);
+
+    const panel = $("profilePanel");
+
+    panel.innerHTML = `
+      <div class="profile">
+
+        <p class="profile-kicker">Regional overview</p>
+        <h2>Conservation Halton watersheds</h2>
+        <p class="profile-rank">${r.total} subwatersheds · 2023 Watershed Report Card</p>
+
+        <div class="hero-row">
+          <div class="gauge-wrap">
+            <div class="gauge">
+              ${gaugeSvg(r.health, healthBin.color)}
+              <div class="gauge-center">
+                <strong>${fmt(r.health)}</strong>
+                <span>Avg health</span>
+              </div>
+            </div>
+            <span class="gauge-label"><i class="swatch" style="background:${healthBin.color}"></i>${escapeHtml(healthBin.label)}</span>
+          </div>
+
+          <div class="hero-facts">
+            <div>
+              <div class="fact-label">Need restoration attention</div>
+              <div class="fact-value">${attention} watersheds <small>high or critical</small></div>
+            </div>
+            <div>
+              <div class="fact-label">Average evidence coverage</div>
+              <div class="fact-value">${fmt(r.coverage)}% <small>of indicator weight</small></div>
+              <div class="meter"><i style="width:${fmt(r.coverage)}%"></i></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="block">
+          <div class="block-title">Priority distribution <small>click to filter</small></div>
+          <div class="stack-bar">${stack}</div>
+          <div class="stack-legend">${stackLegend}</div>
+        </div>
+
+        <div class="block">
+          <div class="block-title">Forest vs surface water <small>regional averages</small></div>
+          ${metricRow({ label: "Forest condition", value: r.forest, color: forestBin ? forestBin.color : COLORS.fair })}
+          ${metricRow({
+            label: "Surface-water condition",
+            value: r.water,
+            color: waterBin ? waterBin.color : COLORS.fair,
+            foot: `Based on the ${r.total - r.noWater} watersheds with surface-water grades.`
+          })}
+        </div>
+
+        <div class="block">
+          <div class="block-title">Top restoration priorities</div>
+          <ol class="mini-list">${top}</ol>
+        </div>
+
+        <div class="block">
+          <div class="block-title">Evidence gaps in the 2023 data</div>
+          <ul class="gap-list">
+            <li><span>No surface-water grades at all</span><b>${r.noWater} of ${r.total}</b></li>
+            <li><span>Benthic invertebrates reported</span><b>${r.reported["Benthic"]} of ${r.total}</b></li>
+            <li><span>Phosphorus reported</span><b>${r.reported["Phosphorus"]} of ${r.total}</b></li>
+            <li><span>E. coli reported</span><b>${r.reported["E. coli"]} of ${r.total}</b></li>
+          </ul>
+        </div>
+
+        <div class="hint">
+          <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M4 3l11 6-5 1.5L8 16z" fill="currentColor"/></svg>
+          Click any watershed on the map or in the list for its full profile.
+        </div>
+
+        <p class="footnote">
+          EcoLens scores are experimental and are not official Conservation Halton assessments.
+          Data: Conservation Halton Open Data · Analysis: EcoLens.
+        </p>
+      </div>
+    `;
+
+    panel.scrollTop = 0;
+    animateGauges(panel);
+  }
+
 })();
