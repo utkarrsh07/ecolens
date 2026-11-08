@@ -1113,6 +1113,52 @@ def watershed_geojson():
         headers=headers
     )
 
+
+@app.route("/api/watersheds/diagnostics")
+def watershed_diagnostics():
+    """
+    Performance numbers for the map pipeline.
+    Open http://127.0.0.1:5000/api/watersheds/diagnostics
+    """
+
+    refresh = request.args.get("refresh") == "1"
+
+    try:
+        bundle, cache_hit = geo_service.get_watershed_bundle(
+            enrich_geojson_with_ecolens_scores,
+            force_refresh=refresh
+        )
+
+    except Exception as error:
+        return jsonify({
+            "success": False,
+            "error": str(error),
+        }), 503
+
+    stats = dict(bundle.stats)
+
+    before = stats.get("vertices_before") or 0
+    after = stats.get("vertices_after") or 0
+
+    return jsonify({
+        "success": True,
+        "source": bundle.source,
+        "cache_hit": cache_hit,
+        "cache_age_seconds": round(
+            geo_service.time.time() - bundle.created_at
+        ),
+        "vertex_reduction_percent": (
+            round((1 - after / before) * 100, 1) if before else None
+        ),
+        "response_kb": round(stats["response_bytes"] / 1024, 1),
+        "response_gzip_kb": round(
+            stats["response_gzip_bytes"] / 1024, 1
+        ),
+        "last_arcgis_error": geo_service.last_error(),
+        "stats": stats,
+    })
+
+
 # ============================================================
 # MAIN DASHBOARD
 # ============================================================
