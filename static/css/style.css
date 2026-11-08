@@ -822,3 +822,375 @@ select {
 }
 
 
+/* ==========================================================
+   PROFILE PANEL
+   ========================================================== */
+
+.profile-panel {
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+
+.profile {
+  padding: 18px 18px 22px;
+  animation: fadeUp 0.28s ease;
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+.profile-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.profile-kicker {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.profile h2 {
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  margin-top: 4px;
+}
+
+.profile-rank {
+  font-size: 0.82rem;
+  color: var(--ink-2);
+  margin-top: 4px;
+}
+
+.icon-btn {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--ink-2);
+  cursor: pointer;
+}
+
+.icon-btn:hover {
+  color: var(--ink);
+  border-color: var(--border-strong);
+}
+
+.block {
+  margin-top: 18px;
+}
+
+.block-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 0.74rem;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 10px;
+}
+
+.block-title small {
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* ---------- hero row: gauge + priority + evidence ---------- */
+
+.gauge-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.gauge-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.hero-row {
+  display: grid;
+  grid-template-columns: 128px 1fr;
+  gap: 14px;
+  align-items: center;
+  margin-top: 16px;
+  padding: 14px;
+  border-radius: 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+.gauge {
+  position: relative;
+  width: 128px;
+  height: 128px;
+}
+
+.gauge svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.gauge-track {
+  stroke: rgba(255, 255, 255, 0.07);
+}
+
+.gauge-fill {
+  transition: stroke-dashoffset 0.7s cubic-bezier(.2, .8, .2, 1);
+}
+
+.gauge-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.gauge-center strong {
+  font-size: 2rem;
+  font-weight: 750;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.gauge-center span {
+  font-size: 0.66rem;
+  color: var(--ink-3);
+  margin-top: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.gauge-center em {
+  font-style: normal;
+  font-size: 0.74rem;
+  color: var(--ink-2);
+  margin-top: 2px;
+}
+
+.hero-facts {
+  display: grid;
+  gap: 12px;
+}
+
+.fact-label {
+  font-size: 0.7rem;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  font-weight: 600;
+}
+
+.priority-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  padding: 5px 10px 5px 8px;
+  border-radius: 9px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-strong);
+}
+
+.priority-badge .swatch {
+  width: 10px;
+  height: 10px;
+}
+
+.priority-badge small {
+  font-weight: 500;
+  color: var(--ink-3);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.meter {
+  height: 6px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.07);
+  margin-top: 6px;
+  overflow: hidden;
+}
+
+.meter > i {
+  display: block;
+  height: 100%;
+  border-radius: 6px;
+  background: var(--accent);
+  transition: width 0.6s ease;
+}
+
+.fact-value {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.86rem;
+  font-weight: 650;
+  margin-top: 2px;
+}
+
+.fact-value small {
+  font-weight: 500;
+  color: var(--ink-3);
+}
+
+/* ---------- metric bars with regional average marker ---------- */
+
+.metric-row {
+  margin-bottom: 12px;
+}
+
+.metric-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 0.84rem;
+}
+
+.metric-head span {
+  color: var(--ink-2);
+}
+
+.metric-value {
+  font-weight: 650;
+}
+
+.metric-value small {
+  color: var(--ink-3);
+  font-weight: 500;
+  margin-left: 4px;
+}
+
+.metric-track {
+  position: relative;
+  height: 8px;
+  margin-top: 6px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.metric-track > i {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 8px;
+  transition: width 0.6s ease;
+}
+
+.metric-track > b {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  background: var(--ink);
+  border-radius: 2px;
+  box-shadow: 0 0 0 2px var(--surface);
+}
+
+.metric-foot {
+  font-size: 0.72rem;
+  color: var(--ink-3);
+  margin-top: 5px;
+}
+
+/* ---------- indicator tiles ---------- */
+
+.indicator-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.ind {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  gap: 10px;
+  align-items: center;
+  padding: 9px 10px;
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid var(--border);
+}
+
+.ind.is-missing {
+  opacity: 0.55;
+}
+
+.grade-badge {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  font-weight: 750;
+  font-size: 0.95rem;
+  color: #fff;
+}
+
+.grade-badge.missing {
+  color: var(--ink-3);
+  font-size: 0.7rem;
+  font-weight: 600;
+  background:
+    repeating-linear-gradient(45deg, #34465a 0 2px, transparent 2px 6px),
+    var(--c-missing);
+}
+
+.ind-name {
+  font-size: 0.8rem;
+  font-weight: 550;
+  line-height: 1.2;
+}
+
+.ind-sub {
+  font-size: 0.7rem;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.ind.is-key {
+  border-color: var(--border-strong);
+}
+
+.ind-flag {
+  font-size: 0.62rem;
+  font-weight: 650;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--accent-ink);
+}
+
+.ind-flag.weak {
+  color: #f4a585;
+}
+
