@@ -255,4 +255,121 @@
     return Math.round(Number(value)) + (metric.suffix || "");
   }
 
+  // --------------------------------------------------------
+  // STATE
+  // --------------------------------------------------------
+
+  const state = {
+    features: [],
+    layers: new Map(),       // feature id -> Leaflet layer
+    metricKey: "priority",
+    priorityFilter: "All",
+    search: "",
+    selectedId: null,
+    hoveredId: null,
+    interpretMode: "analyst",
+    region: null
+  };
+
+  let map = null;
+  let geoLayer = null;
+
+  const $ = (id) => document.getElementById(id);
+
+  function escapeHtml(text) {
+    return String(text === null || text === undefined ? "" : text)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  const fmt = (value, digits) =>
+    isNum(value) ? Number(value).toFixed(digits || 0) : "—";
+
+  const mean = (values) => {
+    const list = values.filter(isNum).map(Number);
+    return list.length
+      ? list.reduce((sum, v) => sum + v, 0) / list.length
+      : null;
+  };
+
+  const normalize = (text) =>
+    String(text || "")
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .replace(/[’']/g, "")
+      .trim();
+
+  // --------------------------------------------------------
+  // REGIONAL STATISTICS (aggregates of Python results)
+  // --------------------------------------------------------
+
+  function computeRegion(features) {
+    const count = (fn) => features.filter(fn).length;
+
+    const reported = (name) =>
+      count((f) => isNum(indicator(f, name).score));
+
+    const priorityCounts = {};
+    PRIORITY_ORDER.forEach((label) => {
+      priorityCounts[label] = count(
+        (f) => props(f).ECOLENS_PRIORITY_LABEL === label
+      );
+    });
+
+    return {
+      total: features.length,
+      ranked: count((f) => isNum(props(f).ECOLENS_PRIORITY_RANK)),
+      health: mean(features.map((f) => props(f).ECOLENS_HEALTH_SCORE)),
+      forest: mean(features.map((f) => props(f).ECOLENS_FOREST_SCORE)),
+      water: mean(features.map((f) => props(f).ECOLENS_WATER_SCORE)),
+      stress: mean(features.map((f) => props(f).ECOLENS_STRESS_INDEX)),
+      coverage: mean(features.map((f) => props(f).ECOLENS_CONFIDENCE)),
+      priorityCounts,
+      noWater: count((f) => !isNum(props(f).ECOLENS_WATER_SCORE)),
+      reported: {
+        "Benthic": reported("Benthic"),
+        "E. coli": reported("E. coli"),
+        "Phosphorus": reported("Phosphorus"),
+        "Forest Interior": reported("Forest Interior")
+      }
+    };
+  }
+
+  // --------------------------------------------------------
+  // KPI STRIP
+  // --------------------------------------------------------
+
+  function renderKpis() {
+    const r = state.region;
+    const attention = r.priorityCounts.Critical + r.priorityCounts.High;
+    const healthBin = conditionBin(r.health);
+
+    $("kpiStrip").innerHTML = `
+      <div class="kpi">
+        <span class="kpi-label">Watersheds</span>
+        <span class="kpi-value">${r.total}</span>
+        <span class="kpi-sub">scored from 2023 grades</span>
+      </div>
+      <div class="kpi">
+        <span class="kpi-label">Average health</span>
+        <span class="kpi-value">${fmt(r.health)}<small>/100</small></span>
+        <span class="kpi-sub">${healthBin ? healthBin.label : "—"}</span>
+      </div>
+      <div class="kpi">
+        <span class="kpi-label">High or critical</span>
+        <span class="kpi-value">${attention}<small> of ${r.ranked}</small></span>
+        <span class="kpi-sub">restoration priority</span>
+      </div>
+      <div class="kpi">
+        <span class="kpi-label">Evidence coverage</span>
+        <span class="kpi-value">${fmt(r.coverage)}<small>%</small></span>
+        <span class="kpi-sub">average indicator weight reported</span>
+      </div>
+    `;
+  }
+
 })();
