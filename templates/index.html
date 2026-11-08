@@ -309,7 +309,122 @@
     </section>
 
 
+    <!-- ===================================================== -->
+    <!-- DATA -->
+    <!-- ===================================================== -->
+
+    <section class="section" id="data">
+
+      <div class="section-head">
+        <p class="eyebrow">Data &amp; attribution</p>
+        <h2>Source data</h2>
+      </div>
+
+      <div class="data-grid">
+
+        <div class="data-card">
+          <span>Dataset</span>
+          <strong>{{ data_source_name }}</strong>
+        </div>
+
+        <div class="data-card">
+          <span>Publisher</span>
+          <strong>{{ data_source_org }}</strong>
+        </div>
+
+        <div class="data-card">
+          <span>Connection</span>
+          <strong>{{ data_last_updated }}</strong>
+        </div>
+
+        <div class="data-card">
+          <span>Official report card</span>
+          <strong>
+            <a href="https://www.conservationhalton.ca/watershed-report-card/" target="_blank" rel="noopener">
+              conservationhalton.ca ↗
+            </a>
+          </strong>
+        </div>
+
+      </div>
+
+      <details class="table-details">
+        <summary>View the raw report-card records ({{ preview_records|length }} shown)</summary>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                {% for col in preview_columns %}
+                  <th>{{ col }}</th>
+                {% endfor %}
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in preview_records %}
+                <tr>
+                  {% for col in preview_columns %}
+                    <td>{{ row[col] }}</td>
+                  {% endfor %}
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </details>
+
+    </section>
+
+
+    <!-- ===================================================== -->
+    <!-- ROADMAP -->
+    <!-- ===================================================== -->
+
+    <section class="section" id="roadmap">
+
+      <div class="section-head">
+        <p class="eyebrow">Roadmap</p>
+        <h2>In development</h2>
+      </div>
+
+      <div class="roadmap">
+        <article>
+          <span class="tag tag-done">Live</span>
+          <h3>Priority engine &amp; map</h3>
+          <p>Health, stress, priority and evidence coverage for every subwatershed.</p>
+        </article>
+        <article>
+          <span class="tag">Next</span>
+          <h3>Anomaly detection</h3>
+          <p>Explainable, rule-based flags where indicators strongly disagree.</p>
+        </article>
+        <article>
+          <span class="tag">Planned</span>
+          <h3>Similar watersheds</h3>
+          <p>Find watersheds with comparable indicator profiles.</p>
+        </article>
+        <article>
+          <span class="tag">Planned</span>
+          <h3>Ask EcoLens &amp; PDF briefs</h3>
+          <p>Plain-language answers and shareable briefs built only on verified EcoLens results.</p>
+        </article>
+      </div>
+
+    </section>
+
   </main>
+
+
+  <footer class="footer">
+    <div>
+      <strong>EcoLens</strong>
+      <p>An independent environmental decision-support prototype.</p>
+    </div>
+    <div>
+      <p><b>Data:</b> Conservation Halton Open Data · <b>Analysis:</b> EcoLens</p>
+      <p>EcoLens scores are experimental and are not official Conservation Halton assessments.</p>
+    </div>
+  </footer>
 
 
   <script id="engineConfig" type="application/json">{{ engine_config|tojson }}</script>
