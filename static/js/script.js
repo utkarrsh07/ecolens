@@ -124,4 +124,135 @@
   const isNum = (value) =>
     value !== null && value !== undefined && !Number.isNaN(Number(value));
 
+  // --------------------------------------------------------
+  // METRICS (what the map can be coloured by)
+  // --------------------------------------------------------
+
+  function conditionMetric(key, label, field, extra) {
+    return Object.assign({
+      key,
+      label,
+      group: "EcoLens scores",
+      kind: "condition",
+      value: (f) => props(f)[field],
+      order: "asc",
+      orderText: "Weakest first",
+      suffix: "/100"
+    }, extra || {});
+  }
+
+  function gradeMetric(key, label, indicatorName) {
+    return {
+      key,
+      label,
+      group: "Report-card grades",
+      kind: "grade",
+      indicatorName,
+      value: (f) => indicator(f, indicatorName).score,
+      display: (f) => gradeLetter(f, indicatorName),
+      order: "asc",
+      orderText: "Weakest grade first"
+    };
+  }
+
+  const METRICS = [
+    {
+      key: "priority",
+      label: "Restoration priority",
+      group: "EcoLens scores",
+      kind: "priority",
+      value: (f) => props(f).ECOLENS_PRIORITY_SCORE,
+      order: "desc",
+      orderText: "Highest priority first",
+      suffix: "/100"
+    },
+    conditionMetric("health", "Environmental health", "ECOLENS_HEALTH_SCORE"),
+    {
+      key: "stress",
+      label: "Environmental stress",
+      group: "EcoLens scores",
+      kind: "stress",
+      value: (f) => props(f).ECOLENS_STRESS_INDEX,
+      order: "desc",
+      orderText: "Most stressed first",
+      suffix: "/100"
+    },
+    conditionMetric("forest", "Forest condition", "ECOLENS_FOREST_SCORE"),
+    conditionMetric("water", "Surface-water condition", "ECOLENS_WATER_SCORE"),
+    {
+      key: "coverage",
+      label: "Evidence coverage",
+      group: "EcoLens scores",
+      kind: "coverage",
+      value: (f) => props(f).ECOLENS_CONFIDENCE,
+      order: "asc",
+      orderText: "Least evidence first",
+      suffix: "%"
+    },
+    gradeMetric("g_forest", "Forest (overall grade)", "Forest Overall"),
+    gradeMetric("g_cover", "Forest cover", "Forest Cover"),
+    gradeMetric("g_interior", "Forest interior", "Forest Interior"),
+    gradeMetric("g_riparian", "Riparian forest", "Forest Riparian"),
+    gradeMetric("g_water", "Water quality (overall grade)", "Water Quality Overall"),
+    gradeMetric("g_benthic", "Benthic invertebrates", "Benthic"),
+    gradeMetric("g_ecoli", "E. coli", "E. coli"),
+    gradeMetric("g_phosph", "Phosphorus", "Phosphorus")
+  ];
+
+  const metricByKey = (key) =>
+    METRICS.find((metric) => metric.key === key) || METRICS[0];
+
+  function binFor(metric, feature) {
+    const value = metric.value(feature);
+
+    if (metric.kind === "priority") {
+      const label = props(feature).ECOLENS_PRIORITY_LABEL;
+      if (!PRIORITY_COLORS[label]) return null;
+      return { label, color: PRIORITY_COLORS[label] };
+    }
+
+    if (!isNum(value)) return null;
+
+    if (metric.kind === "grade") {
+      const letter = (metric.display(feature) || "").charAt(0);
+      return GRADE_BINS.find((bin) => bin.letter === letter) ||
+        conditionBin(value);
+    }
+
+    const bins =
+      metric.kind === "stress" ? STRESS_BINS :
+      metric.kind === "coverage" ? COVERAGE_BINS :
+      CONDITION_BINS;
+
+    return bins.find((bin) => Number(value) >= bin.min);
+  }
+
+  function conditionBin(value) {
+    if (!isNum(value)) return null;
+    return CONDITION_BINS.find((bin) => Number(value) >= bin.min);
+  }
+
+  function legendBins(metric) {
+    if (metric.kind === "priority") {
+      return PRIORITY_ORDER.map((label) => ({
+        label,
+        color: PRIORITY_COLORS[label],
+        range: "≥ " + ENGINE.priority_thresholds[label]
+      }));
+    }
+    if (metric.kind === "grade") return GRADE_BINS;
+    if (metric.kind === "stress") return STRESS_BINS;
+    if (metric.kind === "coverage") return COVERAGE_BINS;
+    return CONDITION_BINS;
+  }
+
+  function formatMetric(metric, feature) {
+    if (metric.kind === "grade") {
+      return metric.display(feature) || "Not reported";
+    }
+    const value = metric.value(feature);
+    if (!isNum(value)) return "No data";
+    return Math.round(Number(value)) + (metric.suffix || "");
+  }
+
 })();
