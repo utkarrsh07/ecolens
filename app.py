@@ -102,6 +102,24 @@ WATER_COMPONENT_WEIGHTS = {
     "Phosphorus": 0.30
 }
 
+# Stress Index weights across the six component indicators.
+STRESS_INDICATOR_WEIGHTS = {
+    "Forest Cover": 0.175,
+    "Forest Interior": 0.175,
+    "Forest Riparian": 0.150,
+    "Benthic": 0.200,
+    "E. coli": 0.150,
+    "Phosphorus": 0.150
+}
+
+PRIORITY_THRESHOLDS = {
+    "Critical": 70,
+    "High": 50,
+    "Moderate": 30,
+    "Low": 0
+}
+
+
 # ============================================================
 # DATA LOADING
 # ============================================================
@@ -578,14 +596,7 @@ def calculate_priority_engine(grades):
     # ENVIRONMENTAL STRESS INDEX
     # ========================================================
 
-    stress_indicator_weights = {
-        "Forest Cover": 0.175,
-        "Forest Interior": 0.175,
-        "Forest Riparian": 0.150,
-        "Benthic": 0.200,
-        "E. coli": 0.150,
-        "Phosphorus": 0.150
-    }
+    stress_indicator_weights = STRESS_INDICATOR_WEIGHTS
 
     stress_total = 0
     stress_weight = 0
