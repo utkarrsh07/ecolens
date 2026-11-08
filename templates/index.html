@@ -4,178 +4,71 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <title>EcoLens | AI-Assisted Watershed Intelligence</title>
+  <title>EcoLens | Watershed Intelligence for Conservation Halton</title>
+
+  <meta
+    name="description"
+    content="EcoLens turns Conservation Halton's 2023 Watershed Report Card into explainable environmental health, stress and restoration-priority scores."
+  >
+
+  <!-- Leaflet + Inter are bundled locally (static/vendor) so the page
+       never depends on a third-party CDN. -->
+  <link
+    rel="stylesheet"
+    href="{{ url_for('static', filename='vendor/leaflet/leaflet.css') }}"
+  >
 
   <link
     rel="stylesheet"
     href="{{ url_for('static', filename='css/style.css') }}"
   >
-
-  <!-- Leaflet map CSS -->
-  <!-- Bundled locally (static/vendor/leaflet). The old CDN link had an
-       incorrect integrity hash, so browsers refused to load this CSS. -->
-  <link
-    rel="stylesheet"
-    href="{{ url_for('static', filename='vendor/leaflet/leaflet.css') }}"
-  >
 </head>
 
 <body>
 
-  <div class="background-glow glow-1"></div>
-  <div class="background-glow glow-2"></div>
-  <div class="background-glow glow-3"></div>
-  <div class="grid-overlay"></div>
-
-
   <!-- ===================================================== -->
-  <!-- HERO -->
+  <!-- TOP BAR -->
   <!-- ===================================================== -->
 
-  <header class="hero" id="top">
+  <header class="topbar">
 
-    <nav class="navbar">
+    <a class="brand" href="#explorer" aria-label="EcoLens home">
 
-      <div class="logo">EcoLens</div>
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 32 32" width="28" height="28">
+          <circle cx="16" cy="16" r="13" fill="none" stroke="currentColor" stroke-width="2.2"/>
+          <path d="M6 19c4-1 6-6 10-6s6 5 10 4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+          <path d="M8 23.5c3-.7 5-3.5 8-3.5s5 2.8 8 2.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" opacity=".55"/>
+        </svg>
+      </span>
 
-      <div class="nav-links">
-        <a href="#platform" class="nav-scroll">Platform</a>
-        <a href="#map-explorer" class="nav-scroll">Map</a>
-        <a href="#dashboard" class="nav-scroll">Dashboard</a>
-        <a href="#ai-engine" class="nav-scroll">AI Engine</a>
-        <a href="#methodology" class="nav-scroll">Method</a>
-      </div>
+      <span class="brand-text">
+        <strong>EcoLens</strong>
+        <span>Watershed Intelligence</span>
+      </span>
 
-      <button
-        class="nav-menu-btn"
-        id="navMenuBtn"
-        type="button"
-      >
-        Menu
-      </button>
+    </a>
 
+    <nav class="topnav" aria-label="Sections">
+      <a href="#explorer">Explorer</a>
+      <a href="#method">Methodology</a>
+      <a href="#data">Data</a>
+      <a href="#roadmap">Roadmap</a>
     </nav>
 
-
-    <div class="mobile-menu" id="mobileMenu">
-      <a href="#platform" class="nav-scroll">Platform</a>
-      <a href="#map-explorer" class="nav-scroll">Map</a>
-      <a href="#dashboard" class="nav-scroll">Dashboard</a>
-      <a href="#ai-engine" class="nav-scroll">AI Engine</a>
-      <a href="#methodology" class="nav-scroll">Method</a>
-    </div>
-
-
-    <div class="hero-content">
-
-      <div class="hero-text">
-
-        <p class="eyebrow">
-          AI-Assisted Watershed Intelligence
-        </p>
-
-        <h1>
-          Explore environmental conditions across Conservation Halton watersheds.
-        </h1>
-
-        <p class="hero-subtext">
-          EcoLens connects directly to public watershed data and transforms
-          technical environmental report-card information into interactive maps,
-          comparative scores, visual trends, and decision-ready insights.
-        </p>
-
-
-        <div class="hero-buttons">
-
-          <button
-            class="primary-btn"
-            onclick="scrollToSection('map-explorer')"
-          >
-            Explore Watersheds
-          </button>
-
-          <button
-            class="secondary-btn"
-            onclick="scrollToSection('dashboard')"
-          >
-            View Dashboard
-          </button>
-
-        </div>
-
-
-        <div class="hero-metrics">
-
-          <div class="hero-metric">
-            <span class="hero-metric-label">
-              Watersheds Loaded
-            </span>
-            <strong>{{ subwatershed_count }}</strong>
-          </div>
-
-          <div class="hero-metric">
-            <span class="hero-metric-label">
-              Data Connection
-            </span>
-            <strong>
-              {% if data_source_status == "live" %}
-                Live ArcGIS API
-              {% else %}
-                Dataset Fallback
-              {% endif %}
-            </strong>
-          </div>
-
-          <div class="hero-metric">
-            <span class="hero-metric-label">
-              Intelligence Modes
-            </span>
-            <strong>
-              Analyst · Public · Policy
-            </strong>
-          </div>
-
-        </div>
-
-      </div>
-
-
-      <div class="hero-card reveal">
-
-        <div class="mini-badge">
-          Live Environmental Data
-        </div>
-
-        <h3>
-          Watershed Intelligence Layer
-        </h3>
-
-        <p>
-          EcoLens retrieves watershed geometry and environmental indicators,
-          standardizes report-card grades, compares environmental performance,
-          and creates an accessible intelligence layer over public data.
-        </p>
-
-        <div class="hero-card-list">
-          <div class="hero-card-item">
-            Live Conservation Halton ArcGIS connection
-          </div>
-
-          <div class="hero-card-item">
-            Interactive watershed polygons
-          </div>
-
-          <div class="hero-card-item">
-            Forest and surface-water indicators
-          </div>
-
-          <div class="hero-card-item">
-            Explainable environmental analysis
-          </div>
-        </div>
-
-      </div>
-
+    <div
+      class="source-chip {{ 'is-live' if data_source_status == 'live' else 'is-fallback' }}"
+      title="{{ data_last_updated }}"
+    >
+      <span class="source-dot" aria-hidden="true"></span>
+      <span>
+        2023 Report Card ·
+        {% if data_source_status == "live" %}
+          via Conservation Halton API
+        {% else %}
+          saved copy
+        {% endif %}
+      </span>
     </div>
 
   </header>
@@ -183,1361 +76,131 @@
 
   <main>
 
-
     <!-- ===================================================== -->
-    <!-- PLATFORM -->
+    <!-- EXPLORER (map first) -->
     <!-- ===================================================== -->
 
-    <section
-      class="platform-section section-shell reveal"
-      id="platform"
-    >
+    <section class="explorer" id="explorer">
 
-      <div class="section-heading">
+      <div class="explorer-head">
 
-        <p class="section-label">
-          Platform Overview
-        </p>
+        <div class="explorer-title">
+          <p class="eyebrow">
+            Conservation Halton · {{ subwatershed_count }} subwatersheds
+          </p>
 
-        <h2>
-          From open environmental data to usable intelligence
-        </h2>
+          <h1>
+            Which watersheds need restoration attention first?
+          </h1>
 
-        <p class="section-copy">
-          EcoLens combines data engineering, geospatial visualization,
-          deterministic analysis, and audience-specific interpretation in
-          one environmental intelligence workflow.
-        </p>
+          <p class="lede">
+            EcoLens turns the 2023 Watershed Report Card's forest and
+            surface-water grades into explainable health, stress and
+            restoration-priority scores.
+            <span class="lede-note">
+              Experimental analysis — not an official Conservation Halton assessment.
+            </span>
+          </p>
+        </div>
+
+        <div class="kpi-strip" id="kpiStrip" aria-live="polite">
+          <div class="kpi skeleton"></div>
+          <div class="kpi skeleton"></div>
+          <div class="kpi skeleton"></div>
+          <div class="kpi skeleton"></div>
+        </div>
 
       </div>
 
 
-      <div class="feature-grid">
+      <div class="explorer-grid">
 
-        <article class="feature-card">
-          <h3>Live Data Pipeline</h3>
-          <p>
-            Retrieves published watershed information directly from a
-            Conservation Halton ArcGIS REST service.
-          </p>
-        </article>
+        <!-- ================= RANKED LIST ================= -->
 
-        <article class="feature-card">
-          <h3>Spatial Exploration</h3>
-          <p>
-            Maps watershed polygons so users can inspect environmental
-            conditions geographically instead of only through tables.
-          </p>
-        </article>
+        <aside class="panel rank-panel" aria-label="Watershed ranking">
 
-        <article class="feature-card">
-          <h3>Environmental Analysis</h3>
-          <p>
-            Converts grade-based indicators into standardized metrics for
-            comparison, ranking, and pattern detection.
-          </p>
-        </article>
+          <div class="panel-head">
+            <div>
+              <h2 id="rankTitle">Restoration priority</h2>
+              <p class="panel-sub" id="rankSubtitle">Highest priority first</p>
+            </div>
+            <span class="count-pill" id="rankCount">—</span>
+          </div>
 
-        <article class="feature-card">
-          <h3>Audience Translation</h3>
-          <p>
-            Transforms technical findings into analyst, public, and policy
-            communication modes.
-          </p>
-        </article>
-
-      </div>
-
-    </section>
-
-
-    <!-- ===================================================== -->
-    <!-- INTERACTIVE MAP -->
-    <!-- ===================================================== -->
-
-    <section
-      class="section-shell map-explorer-section"
-      id="map-explorer"
-    >
-
-      <div class="section-heading reveal">
-
-        <p class="section-label">
-          Interactive Watershed Explorer
-        </p>
-
-        <h2>
-          Explore environmental conditions geographically
-        </h2>
-
-        <p class="section-copy">
-          Select a watershed directly from the map to inspect its forest and
-          surface-water report-card indicators. Polygon colours represent an
-          EcoLens comparison score calculated from available overall grades.
-        </p>
-
-      </div>
-
-
-      <div class="map-toolbar reveal">
-
-        <div class="map-search-wrap">
-
-          <label for="watershedSearch">
-            Find a watershed
-          </label>
-
-          <div class="map-search-row">
-
-            <div class="watershed-search-wrapper">
-
-  <input
-    type="text"
-    id="watershedSearch"
-    placeholder="Search or select a watershed"
-    autocomplete="off"
-  >
-
-  <div
-    id="watershedDropdown"
-    class="watershed-dropdown"
-  ></div>
-
-</div>
-
-            <button
-              id="watershedSearchBtn"
-              class="primary-btn map-search-btn"
-              type="button"
+          <div class="search-box">
+            <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
+              <circle cx="8.5" cy="8.5" r="5.5" fill="none" stroke="currentColor" stroke-width="1.8"/>
+              <path d="m13 13 4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            </svg>
+            <input
+              id="searchInput"
+              type="search"
+              placeholder="Search watersheds"
+              autocomplete="off"
+              aria-label="Search watersheds"
             >
-              Find
-            </button>
-
           </div>
 
-        </div>
-
-
-        <div class="live-status-card">
-
-          <span
-            class="live-status-dot"
-            id="mapStatusDot"
-          ></span>
-
-          <div>
-            <span class="live-status-label">
-              Map Data
-            </span>
-
-            <strong id="mapStatusText">
-              Connecting...
-            </strong>
-          </div>
-
-        </div>
-
-      </div>
-
-
-      <div class="map-layout">
-
-
-        <!-- MAP -->
-
-        <div class="glass-card map-card">
-
-          <div class="panel-header">
-
-            <div>
-              <h3>
-                Conservation Halton Watersheds
-              </h3>
-
-              <p class="map-panel-copy">
-                Hover to identify a watershed. Click to inspect its indicators.
-              </p>
-            </div>
-
-            <span class="panel-tag">
-              Live GeoJSON
-            </span>
-
-          </div>
-
-
-          <div id="watershedMap"></div>
-
-
-          <div class="map-legend">
-
-            <span class="legend-title">
-              EcoLens comparison
-            </span>
-
-            <div class="legend-items">
-
-              <div class="legend-item">
-                <span class="legend-swatch legend-strong"></span>
-                Strong
-              </div>
-
-              <div class="legend-item">
-                <span class="legend-swatch legend-moderate"></span>
-                Moderate
-              </div>
-
-              <div class="legend-item">
-                <span class="legend-swatch legend-attention"></span>
-                Needs Attention
-              </div>
-
-              <div class="legend-item">
-                <span class="legend-swatch legend-critical"></span>
-                Critical
-              </div>
-
-              <div class="legend-item">
-                <span class="legend-swatch legend-no-data"></span>
-                Limited Data
-              </div>
-
-            </div>
-
-          </div>
-
-        </div>
-
-
-        <!-- SELECTED WATERSHED PANEL -->
-
-        <aside
-          class="glass-card watershed-detail-card"
-          id="watershedDetailCard"
-        >
-
-          <div class="selected-watershed-header">
-
-            <div>
-
-              <span class="detail-eyebrow">
-                Selected Watershed
-              </span>
-
-              <h3 id="selectedWatershedName">
-                Select a watershed
-              </h3>
-
-            </div>
-
-            <span
-              class="priority-badge priority-neutral"
-              id="selectedPriority"
-            >
-              Waiting
-            </span>
-
-          </div>
-
-
-          <p
-            class="selected-watershed-description"
-            id="selectedWatershedDescription"
-          >
-            Click any polygon on the map to view its environmental
-            report-card indicators.
-          </p>
-
-
-          <div class="environment-score-card">
-
-            <div>
-
-              <span class="score-label">
-                EcoLens Comparison Score
-              </span>
-
-              <strong id="selectedScore">
-                —
-              </strong>
-
-            </div>
-
-            <span class="score-scale">
-              / 100
-            </span>
-
-          </div>
-
-
-          <div class="indicator-grid">
-
-            <div class="indicator-card">
-              <span>Forest Overall</span>
-              <strong id="forestOverallGrade">—</strong>
-            </div>
-
-            <div class="indicator-card">
-              <span>Forest Cover</span>
-              <strong id="forestCoverGrade">—</strong>
-            </div>
-
-            <div class="indicator-card">
-              <span>Forest Interior</span>
-              <strong id="forestInteriorGrade">—</strong>
-            </div>
-
-            <div class="indicator-card">
-              <span>Riparian Forest</span>
-              <strong id="forestRiparianGrade">—</strong>
-            </div>
-
-            <div class="indicator-card">
-              <span>Water Quality</span>
-              <strong id="waterOverallGrade">—</strong>
-            </div>
-
-            <div class="indicator-card">
-              <span>Benthic</span>
-              <strong id="benthicGrade">—</strong>
-            </div>
-
-            <div class="indicator-card">
-              <span>E. coli</span>
-              <strong id="ecoliGrade">—</strong>
-            </div>
-
-            <div class="indicator-card">
-              <span>Phosphorus</span>
-              <strong id="phosphorusGrade">—</strong>
-            </div>
-
-          </div>
-
-
-          <div class="selected-insight-box">
-
-            <span class="detail-eyebrow">
-              EcoLens Signal
-            </span>
-
-            <p id="selectedWatershedInsight">
-              Environmental signals will appear here after a watershed
-              is selected.
-            </p>
-
-          </div>
-
-
-          <div class="data-disclaimer">
-            EcoLens comparison scores are experimental analysis metrics
-            and are not official Conservation Halton ratings.
-          </div>
+          <div class="filter-row" id="priorityFilters" role="group" aria-label="Filter by priority"></div>
+
+          <ol class="rank-list" id="rankList">
+            <li class="rank-skeleton"></li>
+            <li class="rank-skeleton"></li>
+            <li class="rank-skeleton"></li>
+            <li class="rank-skeleton"></li>
+            <li class="rank-skeleton"></li>
+            <li class="rank-skeleton"></li>
+          </ol>
 
         </aside>
 
-      </div>
 
-    </section>
+        <!-- ================= MAP ================= -->
 
+        <div class="map-stage">
 
-    <!-- ===================================================== -->
-    <!-- DASHBOARD -->
-    <!-- ===================================================== -->
+          <div id="watershedMap" aria-label="Map of Conservation Halton subwatersheds"></div>
 
-    <section
-      class="dashboard section-shell"
-      id="dashboard"
-    >
+          <div class="map-toolbar">
+            <label class="metric-picker">
+              <span>Colour map by</span>
+              <select id="metricSelect" aria-label="Colour map by"></select>
+            </label>
 
-      <div class="section-heading reveal">
-
-        <p class="section-label">
-          Environmental Dashboard
-        </p>
-
-        <h2>
-          Watershed report-card analysis overview
-        </h2>
-
-        <p class="section-copy">
-          EcoLens standardizes report-card grade fields and summarizes
-          environmental patterns across the complete dataset.
-        </p>
-
-      </div>
-
-
-      <section class="stats-grid reveal">
-
-  <div class="stat-card">
-    <span class="stat-label">
-      Environmental Health
-    </span>
-
-    <h3 id="dashboardHealthScore">
-      Select watershed
-    </h3>
-
-    <p id="dashboardHealthLabel">
-      Choose a watershed from the map or search box.
-    </p>
-  </div>
-
-
-  <div class="stat-card">
-    <span class="stat-label">
-      Restoration Priority
-    </span>
-
-    <h3 id="dashboardPriorityLabel">
-      —
-    </h3>
-
-    <p id="dashboardPriorityScore">
-      Experimental EcoLens priority metric.
-    </p>
-  </div>
-
-
-  <div class="stat-card">
-    <span class="stat-label">
-      Data Confidence
-    </span>
-
-    <h3 id="dashboardConfidence">
-      —
-    </h3>
-
-    <p id="dashboardConfidenceLabel">
-      Based on available environmental indicators.
-    </p>
-  </div>
-
-
-  <div class="stat-card">
-    <span class="stat-label">
-      Priority Rank
-    </span>
-
-    <h3 id="dashboardPriorityRank">
-      —
-    </h3>
-
-    <p id="dashboardPriorityPercentile">
-      Compared with ranked watersheds.
-    </p>
-  </div>
-
-</section>
-
-
-      <section>
-
-        <div class="dashboard-main-grid">
-
-          <div class="glass-card reveal">
-
-  <div class="panel-header">
-
-    <h3 id="watershedChartTitle">
-      Selected Watershed Indicator Profile
-    </h3>
-
-    <span class="panel-tag" id="watershedChartTag">
-      Watershed View
-    </span>
-
-  </div>
-
-  <div
-    id="watershedIndicatorChart"
-    class="chart-box"
-    style="min-height: 420px;"
-  ></div>
-
-</div>
-
-
-        <div
-          class="glass-card insights-panel reveal"
-          id="ai-engine"
-        >
-
-          <div class="panel-header">
-
-            <h3>
-              Interpretation Engine
-            </h3>
-
-            <span class="panel-tag">
-              Audience Modes
-            </span>
-
-          </div>
-
-
-          <div class="toggle-container">
-
-            <button
-              id="analystBtn"
-              class="toggle-btn active"
-              type="button"
-            >
-              Analyst
+            <button class="map-btn" id="resetViewBtn" type="button" title="Show all watersheds">
+              <svg viewBox="0 0 20 20" width="15" height="15" aria-hidden="true">
+                <path d="M3 7V3h4M17 7V3h-4M3 13v4h4M17 13v4h-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              </svg>
+              <span>Full region</span>
             </button>
-
-            <button
-              id="publicBtn"
-              class="toggle-btn"
-              type="button"
-            >
-              Public
-            </button>
-
-            <button
-              id="policyBtn"
-              class="toggle-btn"
-              type="button"
-            >
-              Policy
-            </button>
-
           </div>
 
-
-          <div
-            id="analystView"
-            class="insight-block"
-          >
-            <h4>
-              Analyst Summary
-            </h4>
-
-            <p id="analystSummaryText">
-  Select a watershed to generate an analyst interpretation.
-</p>
+          <div class="map-status" id="mapStatus">
+            <span class="status-dot"></span>
+            <span id="mapStatusText">Loading watersheds…</span>
           </div>
 
-
-          <div
-            id="publicView"
-            class="insight-block hidden-view"
-          >
-            <h4>
-              Public Summary
-            </h4>
-
-            <p id="publicSummaryText">
-  Select a watershed to generate a public-facing explanation.
-</p>
-          </div>
-
-
-          <div
-            id="policyView"
-            class="insight-block hidden-view"
-          >
-            <h4>
-              Policy / Planning Summary
-            </h4>
-
-            <p id="policySummaryText">
-  Select a watershed to generate a planning briefing.
-</p>
-          </div>
-
-
-          <div class="insight-block accent-block">
-
-  <h4>
-    Why EcoLens Flagged This
-  </h4>
-
-  <p id="analysisReasonText">
-    Select a watershed to inspect the factors behind its EcoLens assessment.
-  </p>
-
-</div>
-
-        </div>
-
-      </section>
-
-
-      <section class="triple-grid">
-
-
-        <div class="glass-card reveal">
-
-  <div class="panel-header">
-
-    <h3>
-      Environmental Pattern Detection
-    </h3>
-
-    <span class="panel-tag">
-      Explainable Rules
-    </span>
-
-  </div>
-
-
-  <div class="pattern-balance-card">
-
-    <div class="pattern-balance-header">
-
-      <div>
-        <span class="pattern-kicker">
-          Domain Balance
-        </span>
-
-        <strong id="patternDomainSummary">
-          Select a watershed
-        </strong>
-      </div>
-
-      <span
-        class="pattern-gap-badge"
-        id="patternGapBadge"
-      >
-        —
-      </span>
-
-    </div>
-
-
-    <div class="domain-row">
-
-      <div class="domain-row-top">
-        <span>Forest Domain</span>
-        <strong id="patternForestScore">—</strong>
-      </div>
-
-      <div class="domain-track">
-        <div
-          class="domain-fill domain-fill-forest"
-          id="patternForestBar"
-        ></div>
-      </div>
-
-    </div>
-
-
-    <div class="domain-row">
-
-      <div class="domain-row-top">
-        <span>Water Domain</span>
-        <strong id="patternWaterScore">—</strong>
-      </div>
-
-      <div class="domain-track">
-        <div
-          class="domain-fill domain-fill-water"
-          id="patternWaterBar"
-        ></div>
-      </div>
-
-    </div>
-
-
-    <p
-      class="pattern-explanation"
-      id="patternDomainExplanation"
-    >
-      EcoLens will compare forest and surface-water conditions here.
-    </p>
-
-  </div>
-
-
-  <div class="pattern-signal-grid">
-
-    <div class="pattern-signal-card pattern-positive">
-
-      <span class="pattern-kicker">
-        Strongest Indicator
-      </span>
-
-      <strong id="patternStrongestIndicator">
-        —
-      </strong>
-
-      <span
-        class="pattern-grade"
-        id="patternStrongestGrade"
-      >
-        No Data
-      </span>
-
-    </div>
-
-
-    <div class="pattern-signal-card pattern-warning">
-
-      <span class="pattern-kicker">
-        Weakest Indicator
-      </span>
-
-      <strong id="patternWeakestIndicator">
-        —
-      </strong>
-
-      <span
-        class="pattern-grade"
-        id="patternWeakestGrade"
-      >
-        No Data
-      </span>
-
-    </div>
-
-  </div>
-
-</div>
-
-        </div>
-
-
-          <div class="glass-card reveal">
-
-  <div class="panel-header">
-
-    <div>
-      <h3 id="topAreasTitle">
-        Top Performing Watersheds
-      </h3>
-
-      <p class="top-areas-subtitle">
-        Rank watersheds by environmental metric.
-      </p>
-    </div>
-
-    <span class="panel-tag">
-      Live Ranking
-    </span>
-
-  </div>
-
-
-  <div class="metric-selector-wrap">
-
-    <label for="topMetricSelect">
-      Rank by metric
-    </label>
-
-    <select id="topMetricSelect">
-
-      <option value="health">
-        Environmental Health
-      </option>
-
-      <option value="forest">
-        Forest Domain
-      </option>
-
-      <option value="water">
-        Water Domain
-      </option>
-
-      <option value="forestCover">
-        Forest Cover
-      </option>
-
-      <option value="forestInterior">
-        Forest Interior
-      </option>
-
-      <option value="riparian">
-        Riparian Forest
-      </option>
-
-      <option value="surfaceWater">
-        Surface Water
-      </option>
-
-      <option value="benthic">
-        Benthic
-      </option>
-
-      <option value="ecoli">
-        E. coli
-      </option>
-
-      <option value="phosphorus">
-        Phosphorus
-      </option>
-
-    </select>
-
-  </div>
-
-
-  <div
-    id="topAreasChart"
-    class="chart-box"
-    style="min-height: 280px;"
-  ></div>
-
-</div>
-
-
-        <div class="glass-card reveal">
-
-  <div class="panel-header">
-
-    <div>
-      <h3>
-        Watershed Comparison
-      </h3>
-
-      <p class="comparison-subtitle">
-        Selected watershed vs. dataset average.
-      </p>
-    </div>
-
-    <span class="panel-tag">
-      Live Context
-    </span>
-
-  </div>
-
-
-  <!-- Environmental Health -->
-
-  <div class="comparison-item">
-
-    <div class="comparison-heading">
-      <span>Environmental Health</span>
-
-      <strong id="comparisonHealthDifference">
-        —
-      </strong>
-    </div>
-
-    <div class="comparison-values">
-
-      <span>
-        Selected
-        <strong id="comparisonHealthSelected">—</strong>
-      </span>
-
-      <span>
-        Dataset Avg
-        <strong id="comparisonHealthAverage">—</strong>
-      </span>
-
-    </div>
-
-    <div class="comparison-track">
-      <div
-        class="comparison-average-marker"
-        id="comparisonHealthAverageMarker"
-      ></div>
-
-      <div
-        class="comparison-selected-bar"
-        id="comparisonHealthBar"
-      ></div>
-    </div>
-
-  </div>
-
-
-  <!-- Forest Domain -->
-
-  <div class="comparison-item">
-
-    <div class="comparison-heading">
-      <span>Forest Domain</span>
-
-      <strong id="comparisonForestDifference">
-        —
-      </strong>
-    </div>
-
-    <div class="comparison-values">
-
-      <span>
-        Selected
-        <strong id="comparisonForestSelected">—</strong>
-      </span>
-
-      <span>
-        Dataset Avg
-        <strong id="comparisonForestAverage">—</strong>
-      </span>
-
-    </div>
-
-    <div class="comparison-track">
-      <div
-        class="comparison-average-marker"
-        id="comparisonForestAverageMarker"
-      ></div>
-
-      <div
-        class="comparison-selected-bar"
-        id="comparisonForestBar"
-      ></div>
-    </div>
-
-  </div>
-
-
-  <!-- Water Domain -->
-
-  <div class="comparison-item">
-
-    <div class="comparison-heading">
-      <span>Water Domain</span>
-
-      <strong id="comparisonWaterDifference">
-        —
-      </strong>
-    </div>
-
-    <div class="comparison-values">
-
-      <span>
-        Selected
-        <strong id="comparisonWaterSelected">—</strong>
-      </span>
-
-      <span>
-        Dataset Avg
-        <strong id="comparisonWaterAverage">—</strong>
-      </span>
-
-    </div>
-
-    <div class="comparison-track">
-      <div
-        class="comparison-average-marker"
-        id="comparisonWaterAverageMarker"
-      ></div>
-
-      <div
-        class="comparison-selected-bar"
-        id="comparisonWaterBar"
-      ></div>
-    </div>
-
-  </div>
-
-
-  <!-- Priority Context -->
-
-  <div class="comparison-priority">
-
-    <span class="comparison-kicker">
-      Restoration Priority
-    </span>
-
-    <strong id="comparisonPriority">
-      Select a watershed
-    </strong>
-
-    <p id="comparisonPriorityText">
-      Priority context will appear here.
-    </p>
-
-  </div>
-
-</div>
-
-      </section>
-
-
-    <!-- ===================================================== -->
-    <!-- PRIORITY FINDINGS -->
-    <!-- ===================================================== -->
-
-    <section class="section-shell findings-section">
-
-      <div class="section-heading reveal">
-
-        <p class="section-label">
-          Priority Findings
-        </p>
-
-        <h2>
-          Compare higher and lower-performing watersheds
-        </h2>
-
-        <p class="section-copy">
-          The current dashboard highlights both stronger performers and
-          lower-scoring areas so environmental patterns can be reviewed quickly.
-        </p>
-
-      </div>
-
-
-      <div class="dual-grid">
-
-
-        <div class="glass-card reveal">
-
-          <div class="panel-header">
-
-            <h3>
-              Top Strengths
-            </h3>
-
-            <span class="panel-tag">
-              Positive Signals
-            </span>
-
-          </div>
-
-
-          <div class="list-stack">
-
-            {% for item in strengths %}
-
-            <div class="rank-card">
-
-              <div>
-
-                <h4>
-                  {{ item.name }}
-                </h4>
-
-                <p>
-                  Higher combined performance across the available overall
-                  environmental indicators.
-                </p>
-
-              </div>
-
-              <span class="score-pill">
-                {{ item.score }}
-              </span>
-
-            </div>
-
-            {% endfor %}
-
+          <div class="map-legend" id="mapLegend" aria-live="polite"></div>
+
+          <div class="map-loading" id="mapLoading">
+            <div class="spinner" aria-hidden="true"></div>
+            <p>Loading Conservation Halton watersheds…</p>
           </div>
 
         </div>
 
 
-        <div class="glass-card reveal">
+        <!-- ================= PROFILE ================= -->
 
-          <div class="panel-header">
-
-            <h3>
-              Attention Areas
-            </h3>
-
-            <span class="panel-tag">
-              Priority Review
-            </span>
-
+        <aside class="panel profile-panel" id="profilePanel" aria-live="polite">
+          <div class="profile-skeleton">
+            <div class="sk sk-title"></div>
+            <div class="sk sk-block"></div>
+            <div class="sk sk-line"></div>
+            <div class="sk sk-line"></div>
+            <div class="sk sk-block"></div>
           </div>
-
-
-          <div class="list-stack">
-
-            {% for item in attention_areas %}
-
-            <div class="rank-card warning-card">
-
-              <div>
-
-                <h4>
-                  {{ item.name }}
-                </h4>
-
-                <p>
-                  Lower combined performance suggests this watershed may
-                  benefit from deeper environmental review.
-                </p>
-
-              </div>
-
-              <span class="score-pill">
-                {{ item.score }}
-              </span>
-
-            </div>
-
-            {% endfor %}
-
-          </div>
-
-        </div>
-
-      </div>
-
-    </section>
-
-
-    <!-- ===================================================== -->
-    <!-- DATASET PREVIEW -->
-    <!-- ===================================================== -->
-
-    <section class="section-shell reveal">
-
-      <div class="section-heading">
-
-        <p class="section-label">
-          Dataset Preview
-        </p>
-
-        <h2>
-          Environmental indicators behind the analysis
-        </h2>
-
-        <p class="section-copy">
-          These report-card fields form the structured input used by EcoLens.
-        </p>
-
-      </div>
-
-
-      <div class="glass-card table-card">
-
-        <div class="table-wrap">
-
-          <table>
-
-            <thead>
-
-              <tr>
-
-                {% for col in preview_columns %}
-
-                <th>
-                  {{ col }}
-                </th>
-
-                {% endfor %}
-
-              </tr>
-
-            </thead>
-
-
-            <tbody>
-
-              {% for row in preview_records %}
-
-              <tr>
-
-                {% for col in preview_columns %}
-
-                <td>
-                  {{ row[col] }}
-                </td>
-
-                {% endfor %}
-
-              </tr>
-
-              {% endfor %}
-
-            </tbody>
-
-          </table>
-
-        </div>
-
-      </div>
-
-    </section>
-
-
-    <!-- ===================================================== -->
-    <!-- METHODOLOGY -->
-    <!-- ===================================================== -->
-
-    <section
-      class="section-shell methodology-grid"
-      id="methodology"
-    >
-
-
-      <div class="glass-card reveal">
-
-        <div class="panel-header">
-
-          <h3>
-            Why This Matters
-          </h3>
-
-          <span class="panel-tag">
-            Communication Gap
-          </span>
-
-        </div>
-
-        <p>
-          {{ why_it_matters }}
-        </p>
-
-      </div>
-
-
-      <div class="glass-card reveal">
-
-        <div class="panel-header">
-
-          <h3>
-            Methodology
-          </h3>
-
-          <span class="panel-tag">
-            Explainable Logic
-          </span>
-
-        </div>
-
-        <p>
-          {{ methodology_note }}
-        </p>
-
-      </div>
-
-
-      <div class="glass-card reveal">
-
-        <div class="panel-header">
-
-          <h3>
-            Data Source
-          </h3>
-
-          <span class="panel-tag">
-            Open Environmental Data
-          </span>
-
-        </div>
-
-
-        <div class="data-source-list">
-
-          <div class="data-source-item">
-
-            <span>
-              Name
-            </span>
-
-            <strong>
-              {{ data_source_name }}
-            </strong>
-
-          </div>
-
-
-          <div class="data-source-item">
-
-            <span>
-              Organization
-            </span>
-
-            <strong>
-              {{ data_source_org }}
-            </strong>
-
-          </div>
-
-
-          <div class="data-source-item">
-
-            <span>
-              Connection
-            </span>
-
-            <strong>
-              {{ data_last_updated }}
-            </strong>
-
-          </div>
-
-        </div>
-
-      </div>
-
-    </section>
-
-
-    <!-- ===================================================== -->
-    <!-- NEXT DEVELOPMENT -->
-    <!-- ===================================================== -->
-
-    <section class="section-shell reveal">
-
-      <div class="section-heading">
-
-        <p class="section-label">
-          EcoLens Development
-        </p>
-
-        <h2>
-          Intelligence features being added next
-        </h2>
-
-      </div>
-
-
-      <div class="feature-grid">
-
-        <article class="feature-card">
-
-          <h3>
-            Environmental Priority Engine
-          </h3>
-
-          <p>
-            Multi-indicator scoring to rank watersheds using environmental
-            condition and data confidence.
-          </p>
-
-        </article>
-
-
-        <article class="feature-card">
-
-          <h3>
-            Anomaly Detection
-          </h3>
-
-          <p>
-            Identify unusual combinations where environmental indicators
-            strongly disagree.
-          </p>
-
-        </article>
-
-
-        <article class="feature-card">
-
-          <h3>
-            AI Environmental Briefs
-          </h3>
-
-          <p>
-            Generate audience-specific explanations from verified EcoLens
-            metrics rather than raw environmental data.
-          </p>
-
-        </article>
-
-
-        <article class="feature-card">
-
-          <h3>
-            Ask EcoLens
-          </h3>
-
-          <p>
-            Conversational querying for watershed comparisons, environmental
-            indicators, and decision-support summaries.
-          </p>
-
-        </article>
+        </aside>
 
       </div>
 
@@ -1547,85 +210,10 @@
   </main>
 
 
-  <!-- ===================================================== -->
-  <!-- FOOTER -->
-  <!-- ===================================================== -->
+  <script id="engineConfig" type="application/json">{{ engine_config|tojson }}</script>
 
-  <footer
-    class="footer section-shell reveal"
-    id="contact"
-  >
-
-    <div class="footer-grid">
-
-
-      <div>
-
-        <h3>
-          EcoLens
-        </h3>
-
-        <p>
-          Independent environmental intelligence prototype built to make
-          technical public watershed data easier to explore and interpret.
-        </p>
-
-      </div>
-
-
-      <div>
-
-        <h4>
-          Data
-        </h4>
-
-        <p>
-          Environmental data originates from Conservation Halton open-data
-          services. EcoLens provides an independent analysis and visualization
-          layer.
-        </p>
-
-      </div>
-
-
-      <div>
-
-        <h4>
-          Important Note
-        </h4>
-
-        <p>
-          EcoLens comparison metrics are experimental and should not be
-          interpreted as official Conservation Halton assessments.
-        </p>
-
-      </div>
-
-
-    </div>
-
-
-    <button
-      class="back-top-btn"
-      type="button"
-      onclick="scrollToSection('top')"
-    >
-      Back to Top
-    </button>
-
-  </footer>
-
-
-  <!-- Leaflet -->
-<script
-  src="{{ url_for('static', filename='vendor/leaflet/leaflet.js') }}"
-></script>
-
-<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
-
-<script
-  src="{{ url_for('static', filename='js/script.js') }}"
-></script>
+  <script src="{{ url_for('static', filename='vendor/leaflet/leaflet.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/script.js') }}"></script>
 
 </body>
 </html>
