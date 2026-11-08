@@ -1777,6 +1777,16 @@ def home():
         preview_columns=preview_columns,
 
         why_it_matters=why_it_matters,
+        engine_config={
+            "grade_map": ENVIRONMENTAL_GRADE_MAP,
+            "forest_weights": FOREST_COMPONENT_WEIGHTS,
+            "water_weights": WATER_COMPONENT_WEIGHTS,
+            "stress_weights": STRESS_INDICATOR_WEIGHTS,
+            "priority_thresholds": PRIORITY_THRESHOLDS,
+            "condition_weight": 0.65,
+            "stress_weight": 0.35,
+            "fallback_coverage": 60
+        },
         methodology_note=methodology_note,
         ai_note=ai_note,
 
