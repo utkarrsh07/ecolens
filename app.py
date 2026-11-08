@@ -1,4 +1,4 @@
-from flask import Flask, render_template, jsonify
+from flask import Flask, render_template, jsonify, request, Response
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -1049,17 +1049,20 @@ def simplify_coordinates(coords, tolerance=0.00008):
 
 @app.route("/api/watersheds")
 def watershed_geojson():
+    """
+    Scored, simplified watershed GeoJSON for the Leaflet map.
+
+    The response is built once and cached in memory, then sent:
+      - gzip-compressed when the browser accepts it
+      - with an ETag, so a repeat visit can get "304 Not Modified"
+      - with Cache-Control, so the browser and Vercel's CDN can reuse it
+      - with a Server-Timing header (visible in DevTools > Network > Timing)
+    """
+
     try:
-        geojson = fetch_live_geojson()
-
-        # Add EcoLens Priority Engine results
-        # to every watershed before sending it
-        # to the frontend.
-        geojson = enrich_geojson_with_ecolens_scores(
-            geojson
+        bundle, cache_hit = geo_service.get_watershed_bundle(
+            enrich_geojson_with_ecolens_scores
         )
-
-        return jsonify(geojson)
 
     except Exception as error:
         return jsonify({
@@ -1067,6 +1070,48 @@ def watershed_geojson():
             "error": "Live watershed geometry is currently unavailable.",
             "details": str(error)
         }), 503
+
+    stats = bundle.stats
+
+    headers = {
+        "ETag": bundle.etag,
+        "Cache-Control":
+            "public, max-age=300, s-maxage=3600, "
+            "stale-while-revalidate=86400",
+        "Vary": "Accept-Encoding",
+        "X-EcoLens-Source": bundle.source,
+        "X-EcoLens-Cache": "HIT" if cache_hit else "MISS",
+        "Access-Control-Expose-Headers":
+            "X-EcoLens-Source, X-EcoLens-Cache, Server-Timing",
+    }
+
+    if not cache_hit:
+        headers["Server-Timing"] = ", ".join([
+            f"arcgis;dur={stats.get('fetch_ms', 0)}",
+            f"simplify;dur={stats.get('simplify_ms', 0)}",
+            f"score;dur={stats.get('score_ms', 0)}",
+            f"serialize;dur={stats.get('serialize_ms', 0)}",
+        ])
+
+    if bundle.etag in request.headers.get("If-None-Match", ""):
+        return Response(status=304, headers=headers)
+
+    accepts_gzip = "gzip" in request.headers.get(
+        "Accept-Encoding", ""
+    ).lower()
+
+    if accepts_gzip:
+        body = bundle.body_gzip
+        headers["Content-Encoding"] = "gzip"
+    else:
+        body = bundle.body
+
+    return Response(
+        body,
+        status=200,
+        mimetype="application/json",
+        headers=headers
+    )
 
 # ============================================================
 # MAIN DASHBOARD
