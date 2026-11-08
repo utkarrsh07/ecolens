@@ -637,4 +637,221 @@
     });
   }
 
+  // --------------------------------------------------------
+  // FILTERS + RANKED LIST
+  // --------------------------------------------------------
+
+  function passesFilters(feature) {
+    if (
+      state.priorityFilter !== "All" &&
+      props(feature).ECOLENS_PRIORITY_LABEL !== state.priorityFilter
+    ) {
+      return false;
+    }
+
+    if (state.search && !normalize(nameOf(feature)).includes(state.search)) {
+      return false;
+    }
+
+    return true;
+  }
+
+  function renderFilters() {
+    const counts = state.region.priorityCounts;
+
+    const chips = [`
+      <button class="chip ${state.priorityFilter === "All" ? "active" : ""}" data-filter="All" type="button">
+        All <b>${state.features.length}</b>
+      </button>
+    `].concat(PRIORITY_ORDER.map((label) => `
+      <button class="chip ${state.priorityFilter === label ? "active" : ""}" data-filter="${label}" type="button">
+        <span class="swatch" style="background:${PRIORITY_COLORS[label]}"></span>
+        ${label} <b>${counts[label]}</b>
+      </button>
+    `));
+
+    $("priorityFilters").innerHTML = chips.join("");
+  }
+
+  function setPriorityFilter(label) {
+    state.priorityFilter = label;
+    renderFilters();
+    renderRankList();
+    restyleAll();
+  }
+
+  function sortedFeatures() {
+    const metric = metricByKey(state.metricKey);
+    const direction = metric.order === "desc" ? -1 : 1;
+
+    return state.features
+      .filter(passesFilters)
+      .slice()
+      .sort((a, b) => {
+        const va = metric.value(a);
+        const vb = metric.value(b);
+        const aMissing = !isNum(va);
+        const bMissing = !isNum(vb);
+
+        if (aMissing && bMissing) return nameOf(a).localeCompare(nameOf(b));
+        if (aMissing) return 1;
+        if (bMissing) return -1;
+
+        if (Number(va) !== Number(vb)) {
+          return (Number(va) - Number(vb)) * direction;
+        }
+
+        if (metric.kind !== "priority") {
+          const pa0 = props(a).ECOLENS_PRIORITY_RANK || 9999;
+          const pb0 = props(b).ECOLENS_PRIORITY_RANK || 9999;
+          if (pa0 !== pb0) return pa0 - pb0;
+        }
+
+        // Tie-break by restoration priority, then name.
+        const pa = props(a).ECOLENS_PRIORITY_SCORE || 0;
+        const pb = props(b).ECOLENS_PRIORITY_SCORE || 0;
+        if (pa !== pb) return pb - pa;
+
+        return nameOf(a).localeCompare(nameOf(b));
+      });
+  }
+
+  function displayRank(metric, feature) {
+    if (metric.kind === "priority") {
+      return props(feature).ECOLENS_PRIORITY_RANK || "–";
+    }
+
+    const value = metric.value(feature);
+    if (!isNum(value)) return "–";
+
+    const better = state.features.filter((other) => {
+      const v = metric.value(other);
+      if (!isNum(v)) return false;
+      return metric.order === "desc" ? Number(v) > Number(value) : Number(v) < Number(value);
+    }).length;
+
+    return better + 1;
+  }
+
+  function renderRankList() {
+    const metric = metricByKey(state.metricKey);
+    const list = sortedFeatures();
+
+    $("rankTitle").textContent =
+      metric.kind === "priority" ? "Restoration priority" : metric.label;
+
+    $("rankSubtitle").textContent = metric.orderText;
+    $("rankCount").textContent = `${list.length} of ${state.features.length}`;
+
+    if (!list.length) {
+      $("rankList").innerHTML = `<li class="rank-empty">No watersheds match these filters.</li>`;
+      return;
+    }
+
+    $("rankList").innerHTML = list.map((feature) => {
+      const bin = binFor(metric, feature);
+      const value = metric.value(feature);
+      const width =
+        metric.kind === "grade" || !isNum(value)
+          ? (isNum(value) ? Number(value) : 0)
+          : Math.max(3, Math.min(100, Number(value)));
+
+      const secondary =
+        metric.kind === "priority"
+          ? (props(feature).ECOLENS_PRIORITY_LABEL || "")
+          : (bin && metric.kind !== "grade" ? bin.label : "");
+
+      const id = feature.__id;
+
+      return `
+        <li>
+          <button class="rank-item ${id === state.selectedId ? "active" : ""}" data-id="${id}" type="button">
+            <span class="rank-pos">${displayRank(metric, feature)}</span>
+            <span class="rank-main">
+              <span class="rank-name">${escapeHtml(nameOf(feature))}</span>
+              <span class="rank-bar"><i style="width:${width}%;background:${bin ? bin.color : COLORS.missing}"></i></span>
+            </span>
+            <span class="rank-score">
+              ${escapeHtml(formatMetric(metric, feature).replace("/100", ""))}
+              <small>${escapeHtml(secondary)}</small>
+            </span>
+          </button>
+        </li>
+      `;
+    }).join("");
+  }
+
+  function scrollRowIntoView(id) {
+    const row = document.querySelector(`.rank-item[data-id="${id}"]`);
+    if (!row) return;
+
+    const list = $("rankList");
+    const rowTop = row.offsetTop - list.offsetTop;
+    const rowBottom = rowTop + row.offsetHeight;
+
+    if (rowTop < list.scrollTop || rowBottom > list.scrollTop + list.clientHeight) {
+      list.scrollTo({ top: rowTop - list.clientHeight / 2, behavior: "smooth" });
+    }
+  }
+
+  // --------------------------------------------------------
+  // SELECTION
+  // --------------------------------------------------------
+
+  function selectWatershed(id, options) {
+    const feature = state.features[id];
+    if (!feature) return;
+
+    state.selectedId = id;
+    restyleAll();
+
+    document.querySelectorAll(".rank-item.active").forEach((el) => el.classList.remove("active"));
+    const row = document.querySelector(`.rank-item[data-id="${id}"]`);
+    if (row) row.classList.add("active");
+    scrollRowIntoView(id);
+
+    renderProfile(feature);
+
+    if (options && options.fly) {
+      const layer = state.layers.get(id);
+      if (layer) {
+        map.flyToBounds(layer.getBounds(), {
+          padding: [70, 70],
+          maxZoom: 13,
+          duration: 0.55
+        });
+      }
+    }
+
+    try {
+      history.replaceState(null, "", "#w=" + encodeURIComponent(nameOf(feature)));
+    } catch (error) { /* ignore */ }
+  }
+
+  function clearSelection() {
+    state.selectedId = null;
+    restyleAll();
+    document.querySelectorAll(".rank-item.active").forEach((el) => el.classList.remove("active"));
+    renderOverview();
+    fitRegion(true);
+
+    try {
+      history.replaceState(null, "", window.location.pathname + window.location.search);
+    } catch (error) { /* ignore */ }
+  }
+
+  function selectFromHash() {
+    const match = window.location.hash.match(/^#w=(.+)$/);
+    if (!match) return false;
+
+    const wanted = normalize(decodeURIComponent(match[1]));
+    const feature = state.features.find((f) => normalize(nameOf(f)) === wanted);
+
+    if (feature) {
+      selectWatershed(feature.__id, { fly: true });
+      return true;
+    }
+    return false;
+  }
+
 })();
