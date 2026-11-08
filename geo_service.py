@@ -162,3 +162,202 @@ def validate_feature_collection(geojson):
         raise ValueError("GeoJSON contained zero watershed features.")
 
 
+# ============================================================
+# 2. SIMPLIFY (Douglas-Peucker)
+# ============================================================
+#
+# Douglas-Peucker in one paragraph:
+#   Draw a straight line from the first point of a boundary to the last.
+#   Find the point that is furthest from that line. If it is closer than the
+#   tolerance, every point in between can be dropped - the straight line is a
+#   good enough drawing. Otherwise keep that point and repeat on the two
+#   halves. The result keeps the corners that define the shape and drops the
+#   thousands of tiny wiggles you cannot see on screen.
+#
+# The old simplifier just skipped points that were close to the previous
+# point. That removes the wrong points (it keeps wiggles, drops corners when
+# vertices are dense) and has no guarantee about how far the shape moves.
+# Douglas-Peucker guarantees no part of the boundary moves by more than the
+# tolerance.
+#
+# Coordinates are converted to metres first (longitude degrees are only ~73%
+# as long as latitude degrees at 43.4 N), so the tolerance means the same
+# thing in every direction.
+
+def douglas_peucker_mask(points_xy, tolerance):
+    """
+    Return a boolean mask of points to keep.
+
+    points_xy: numpy array of shape (n, 2), in metres.
+    Iterative (no recursion limit) and vectorized with numpy.
+    """
+
+    n = len(points_xy)
+    keep = np.zeros(n, dtype=bool)
+
+    if n <= 2:
+        keep[:] = True
+        return keep
+
+    keep[0] = True
+    keep[-1] = True
+
+    stack = [(0, n - 1)]
+
+    while stack:
+        start, end = stack.pop()
+
+        if end - start < 2:
+            continue
+
+        a = points_xy[start]
+        b = points_xy[end]
+        segment = points_xy[start + 1:end]
+
+        ab = b - a
+        length_sq = float(ab @ ab)
+
+        if length_sq == 0.0:
+            # Closed ring: first == last. Distance is just distance to a.
+            distances = np.hypot(
+                segment[:, 0] - a[0], segment[:, 1] - a[1]
+            )
+        else:
+            # Distance from each point to the segment a-b.
+            t = ((segment - a) @ ab) / length_sq
+            t = np.clip(t, 0.0, 1.0)
+            projection = a + np.outer(t, ab)
+            delta = segment - projection
+            distances = np.hypot(delta[:, 0], delta[:, 1])
+
+        index = int(np.argmax(distances))
+
+        if distances[index] > tolerance:
+            split = start + 1 + index
+            keep[split] = True
+            stack.append((start, split))
+            stack.append((split, end))
+
+    return keep
+
+
+def simplify_ring(ring, tolerance_metres, decimals=COORDINATE_DECIMALS):
+    """
+    Simplify one closed polygon ring.
+
+    Returns a new ring (list of [lon, lat]) or None if the ring collapses
+    below 4 points (meaning it is smaller than the tolerance).
+    """
+
+    if not ring or len(ring) < 4:
+        return ring
+
+    coords = np.asarray([p[:2] for p in ring], dtype=float)
+
+    mean_lat = float(np.mean(coords[:, 1]))
+    x_scale = METRES_PER_DEGREE_LON_AT_EQUATOR * np.cos(np.radians(mean_lat))
+
+    xy = np.column_stack((
+        coords[:, 0] * x_scale,
+        coords[:, 1] * METRES_PER_DEGREE_LAT,
+    ))
+
+    keep = douglas_peucker_mask(xy, tolerance_metres)
+    kept = np.round(coords[keep], decimals)
+
+    # Remove consecutive duplicates created by rounding.
+    if len(kept) > 1:
+        changed = np.any(np.diff(kept, axis=0) != 0, axis=1)
+        kept = kept[np.concatenate(([True], changed))]
+
+    # Keep the ring closed.
+    if len(kept) and not np.array_equal(kept[0], kept[-1]):
+        kept = np.vstack((kept, kept[0]))
+
+    if len(kept) < 4:
+        return None
+
+    return kept.tolist()
+
+
+def simplify_polygon(rings, tolerance_metres):
+    """Polygon = [outer ring, hole, hole, ...]."""
+
+    if not rings:
+        return rings
+
+    result = []
+
+    for index, ring in enumerate(rings):
+        simplified = simplify_ring(ring, tolerance_metres)
+
+        if simplified is None:
+            if index == 0:
+                # Never lose a watershed's outer boundary.
+                simplified = [
+                    [round(p[0], COORDINATE_DECIMALS),
+                     round(p[1], COORDINATE_DECIMALS)]
+                    for p in ring
+                ]
+            else:
+                # Hole smaller than the tolerance: invisible, drop it.
+                continue
+
+        result.append(simplified)
+
+    return result
+
+
+def count_vertices(geometry):
+    if not geometry:
+        return 0
+
+    kind = geometry.get("type")
+    coords = geometry.get("coordinates") or []
+
+    if kind == "Polygon":
+        return sum(len(ring) for ring in coords)
+
+    if kind == "MultiPolygon":
+        return sum(len(ring) for polygon in coords for ring in polygon)
+
+    return 0
+
+
+def simplify_geometry(geometry, tolerance_metres):
+    if not geometry:
+        return geometry
+
+    kind = geometry.get("type")
+    coords = geometry.get("coordinates")
+
+    if kind == "Polygon":
+        return {"type": "Polygon",
+                "coordinates": simplify_polygon(coords, tolerance_metres)}
+
+    if kind == "MultiPolygon":
+        polygons = [
+            simplify_polygon(polygon, tolerance_metres)
+            for polygon in coords
+        ]
+        return {"type": "MultiPolygon",
+                "coordinates": [p for p in polygons if p]}
+
+    return geometry
+
+
+def simplify_feature_collection(geojson, tolerance_metres=SIMPLIFY_TOLERANCE_METRES):
+    """Simplify every feature in place. Returns (before, after) vertex counts."""
+
+    before = 0
+    after = 0
+
+    for feature in geojson.get("features", []):
+        geometry = feature.get("geometry")
+        before += count_vertices(geometry)
+        feature["geometry"] = simplify_geometry(geometry, tolerance_metres)
+        after += count_vertices(feature["geometry"])
+
+    return before, after
+
+
