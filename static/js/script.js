@@ -2608,10 +2608,33 @@ async function initializeWatershedMap() {
     );
 
 
+    // Abort if the server takes too long, so the map never sits on
+    // "Loading live watersheds..." forever.
+    const controller =
+      new AbortController();
+
+    const fetchTimeout =
+      setTimeout(
+        () => controller.abort(),
+        30000
+      );
+
     const response =
       await fetch(
-        "/api/watersheds"
+        "/api/watersheds",
+        {
+          signal: controller.signal
+        }
       );
+
+    clearTimeout(
+      fetchTimeout
+    );
+
+    const dataSource =
+      response.headers.get(
+        "X-EcoLens-Source"
+      ) || "live";
 
 
     if (!response.ok) {
@@ -2695,7 +2718,9 @@ async function initializeWatershedMap() {
 
 
     setMapStatus(
-      `${watershedFeatures.length} live polygons`,
+      dataSource === "snapshot"
+        ? `${watershedFeatures.length} polygons (saved snapshot)`
+        : `${watershedFeatures.length} live polygons`,
       "live"
     );
 
