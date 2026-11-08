@@ -455,6 +455,8 @@ def calculate_priority_engine(grades):
         FOREST_COMPONENT_WEIGHTS
     )
 
+    forest_basis = "components" if forest_score is not None else "none"
+
     # If no forest component information exists, allow the
     # published overall forest grade to act as a fallback.
     # Confidence is reduced because component-level evidence
@@ -469,6 +471,7 @@ def calculate_priority_engine(grades):
         if fallback_forest is not None:
             forest_score = fallback_forest
             forest_coverage = 0.60
+            forest_basis = "overall grade"
 
     # ========================================================
     # SURFACE WATER DOMAIN
@@ -479,6 +482,8 @@ def calculate_priority_engine(grades):
         WATER_COMPONENT_WEIGHTS
     )
 
+    water_basis = "components" if water_score is not None else "none"
+
     if water_score is None:
 
         fallback_water = environmental_grade_to_score(
@@ -488,6 +493,7 @@ def calculate_priority_engine(grades):
         if fallback_water is not None:
             water_score = fallback_water
             water_coverage = 0.60
+            water_basis = "overall grade"
 
     # ========================================================
     # OVERALL ENVIRONMENTAL HEALTH
@@ -518,7 +524,11 @@ def calculate_priority_engine(grades):
             "Confidence": 0,
             "Confidence Label": "Limited",
             "Strongest Indicator": "No Data",
-            "Weakest Indicator": "No Data"
+            "Weakest Indicator": "No Data",
+            "Forest Coverage": 0,
+            "Water Coverage": 0,
+            "Forest Basis": "none",
+            "Water Basis": "none"
         }
 
     health_score = round(
@@ -722,7 +732,12 @@ def calculate_priority_engine(grades):
 
         "Strongest Indicator": strongest_indicator,
 
-        "Weakest Indicator": weakest_indicator
+        "Weakest Indicator": weakest_indicator,
+
+        "Forest Coverage": round(forest_coverage * 100),
+        "Water Coverage": round(water_coverage * 100),
+        "Forest Basis": forest_basis,
+        "Water Basis": water_basis
     }
 
 def arcgis_properties_to_grades(properties):
@@ -824,6 +839,13 @@ def enrich_geojson_with_ecolens_scores(geojson):
         properties["ECOLENS_WEAKEST_INDICATOR"] = result[
             "Weakest Indicator"
         ]
+
+        # Evidence behind each domain score, so the frontend can
+        # explain the calculation without re-implementing it.
+        properties["ECOLENS_FOREST_COVERAGE"] = result["Forest Coverage"]
+        properties["ECOLENS_WATER_COVERAGE"] = result["Water Coverage"]
+        properties["ECOLENS_FOREST_BASIS"] = result["Forest Basis"]
+        properties["ECOLENS_WATER_BASIS"] = result["Water Basis"]
 
         if result["Priority Score"] is not None:
             scored_features.append(feature)
