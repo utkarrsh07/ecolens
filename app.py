@@ -10,6 +10,8 @@ from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
 from urllib.parse import urlencode
 
+import geo_service
+
 
 app = Flask(__name__)
 
@@ -108,79 +110,13 @@ def fetch_live_geojson():
     """
     Retrieve live Conservation Halton watershed geometry and grades.
 
-    Geometry is generalized by ArcGIS before transmission so EcoLens
-    does not need to download the full-resolution watershed polygons.
+    Kept for compatibility. The real work (server-side generalization,
+    timeouts, gzip) now lives in geo_service.fetch_arcgis_geojson().
+    Prefer geo_service.get_watershed_bundle(), which is cached.
     """
 
-    params = {
-        "where": "1=1",
-
-        # Only download attributes EcoLens actually uses.
-        "outFields": ",".join(ARCGIS_FIELDS),
-
-        "returnGeometry": "true",
-
-        # Leaflet / GeoJSON coordinates.
-        "outSR": "4326",
-
-        # ArcGIS performs real geometry generalization BEFORE sending
-        # the response to EcoLens.
-        #
-        # 0.00005 degrees is roughly 5 metres north/south around
-        # Conservation Halton. This is small relative to normal
-        # dashboard map resolution while eliminating unnecessary
-        # boundary vertices.
-        "maxAllowableOffset": "0.00005",
-
-        # Avoid transmitting meaningless coordinate precision.
-        "geometryPrecision": "5",
-
-        "f": "geojson",
-    }
-
-    request_url = ARCGIS_QUERY_URL + "?" + urlencode(params)
-
-    request = Request(
-        request_url,
-        headers={
-            "User-Agent": "EcoLens/1.0",
-            "Accept": "application/geo+json, application/json",
-        },
-    )
-
-    try:
-        with urlopen(request, timeout=20) as response:
-            raw_data = response.read().decode("utf-8")
-            geojson = json.loads(raw_data)
-
-        if geojson.get("type") != "FeatureCollection":
-            raise ValueError(
-                "ArcGIS response was not a GeoJSON FeatureCollection."
-            )
-
-        features = geojson.get("features", [])
-
-        if not features:
-            raise ValueError(
-                "ArcGIS returned zero watershed features."
-            )
-
-        return geojson
-
-    except HTTPError as error:
-        raise RuntimeError(
-            f"ArcGIS HTTP error: {error.code}"
-        ) from error
-
-    except URLError as error:
-        raise RuntimeError(
-            f"Could not connect to ArcGIS: {error.reason}"
-        ) from error
-
-    except json.JSONDecodeError as error:
-        raise RuntimeError(
-            "ArcGIS returned data that could not be parsed as JSON."
-        ) from error
+    geojson, _ = geo_service.fetch_arcgis_geojson()
+    return geojson
 
 
 def geojson_to_dataframe(geojson):
@@ -247,8 +183,14 @@ def load_dataset():
     """
 
     try:
-        geojson = fetch_live_geojson()
-        df = geojson_to_dataframe(geojson)
+        # One shared, cached ArcGIS fetch for the whole app.
+        # The homepage and /api/watersheds no longer download the
+        # geometry separately on every visit.
+        bundle, _ = geo_service.get_watershed_bundle(
+            enrich_geojson_with_ecolens_scores
+        )
+
+        df = pd.DataFrame(bundle.attributes)
 
         df.columns = [
             str(column).strip().upper()
@@ -257,15 +199,24 @@ def load_dataset():
 
         validate_dataset(df)
 
-        app.logger.info(
-            "EcoLens loaded %s live ArcGIS records.",
-            len(df)
-        )
+        if bundle.source == "live":
+
+            app.logger.info(
+                "EcoLens loaded %s live ArcGIS records.",
+                len(df)
+            )
+
+            return (
+                df,
+                "live",
+                "Connected directly to the Conservation Halton ArcGIS REST API"
+            )
 
         return (
             df,
-            "live",
-            "Connected directly to the Conservation Halton ArcGIS REST API"
+            "fallback",
+            "ArcGIS was unavailable, so EcoLens is using its saved "
+            "ArcGIS snapshot"
         )
 
     except Exception as error:
