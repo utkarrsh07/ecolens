@@ -398,3 +398,138 @@ def snapshot_age_text():
     return time.strftime("%Y-%m-%d %H:%M", time.localtime(modified))
 
 
+# ============================================================
+# 4. BUNDLE + CACHE
+# ============================================================
+
+class WatershedBundle:
+    """One fully processed, ready-to-send copy of the watershed data."""
+
+    def __init__(self, geojson, attributes, source, stats):
+        self.geojson = geojson          # scored GeoJSON (dict)
+        self.attributes = attributes    # list of original property dicts
+        self.source = source            # "live" or "snapshot"
+        self.stats = stats              # timings and sizes
+        self.created_at = time.time()
+
+        # A snapshot-based bundle retries ArcGIS after 10 minutes.
+        self.ttl = CACHE_SECONDS if source == "live" else 600
+
+        body = json.dumps(
+            geojson, separators=(",", ":"), ensure_ascii=False
+        ).encode("utf-8")
+
+        self.body = body
+        self.body_gzip = gzip.compress(body, compresslevel=6)
+        self.etag = '"' + hashlib.sha1(body).hexdigest()[:20] + '"'
+
+        self.stats["response_bytes"] = len(body)
+        self.stats["response_gzip_bytes"] = len(self.body_gzip)
+
+    def is_fresh(self):
+        return (time.time() - self.created_at) < self.ttl
+
+
+_cache_lock = threading.Lock()
+_cached_bundle = None
+_last_error = None
+
+
+def _build_bundle(score_callback):
+    """Run the full pipeline once. Tries ArcGIS, then the snapshot."""
+
+    global _last_error
+
+    stats = {}
+    started = time.perf_counter()
+
+    # ---- fetch -------------------------------------------------
+    try:
+        geojson, downloaded = fetch_arcgis_geojson()
+        source = "live"
+        stats["arcgis_bytes"] = downloaded
+        _last_error = None
+    except Exception as error:
+        _last_error = str(error)
+        try:
+            geojson = read_snapshot()
+        except (OSError, ValueError) as snapshot_error:
+            raise RuntimeError(
+                f"{_last_error}. No saved snapshot is available yet "
+                f"({type(snapshot_error).__name__})."
+            ) from snapshot_error
+        source = "snapshot"
+        stats["arcgis_bytes"] = 0
+        stats["arcgis_error"] = _last_error
+        stats["snapshot_saved_at"] = snapshot_age_text()
+
+    stats["fetch_ms"] = round((time.perf_counter() - started) * 1000)
+
+    # ---- simplify ----------------------------------------------
+    step = time.perf_counter()
+    before, after = simplify_feature_collection(geojson)
+    stats["simplify_ms"] = round((time.perf_counter() - step) * 1000)
+    stats["vertices_before"] = before
+    stats["vertices_after"] = after
+    stats["tolerance_metres"] = SIMPLIFY_TOLERANCE_METRES
+    stats["features"] = len(geojson.get("features", []))
+
+    if source == "live":
+        stats["snapshot_written"] = write_snapshot(geojson)
+
+    # Keep an untouched copy of the attributes for the dashboard (pandas).
+    attributes = [
+        copy.deepcopy(feature.get("properties") or {})
+        for feature in geojson.get("features", [])
+    ]
+
+    # ---- score -------------------------------------------------
+    step = time.perf_counter()
+    if score_callback is not None:
+        geojson = score_callback(geojson)
+    stats["score_ms"] = round((time.perf_counter() - step) * 1000)
+
+    # ---- serialize + compress ---------------------------------
+    step = time.perf_counter()
+    bundle = WatershedBundle(geojson, attributes, source, stats)
+    stats["serialize_ms"] = round((time.perf_counter() - step) * 1000)
+    stats["total_ms"] = round((time.perf_counter() - started) * 1000)
+
+    return bundle
+
+
+def get_watershed_bundle(score_callback=None, force_refresh=False):
+    """
+    Return the cached bundle, building it if needed.
+
+    Thread-safe: if the homepage and /api/watersheds arrive at the same time,
+    only one of them talks to ArcGIS; the other waits and reuses the result.
+    If a refresh fails but an older bundle exists, the older one is served.
+    """
+
+    global _cached_bundle
+
+    bundle = _cached_bundle
+    if bundle is not None and bundle.is_fresh() and not force_refresh:
+        return bundle, True
+
+    with _cache_lock:
+        bundle = _cached_bundle
+        if bundle is not None and bundle.is_fresh() and not force_refresh:
+            return bundle, True
+
+        try:
+            _cached_bundle = _build_bundle(score_callback)
+        except Exception:
+            if bundle is not None:
+                # Stale-but-working beats broken. Retry in 5 minutes.
+                bundle.created_at = time.time()
+                bundle.ttl = 300
+                return bundle, True
+            raise
+
+        return _cached_bundle, False
+
+
+def last_error():
+    return _last_error
