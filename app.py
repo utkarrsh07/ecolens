@@ -847,6 +847,24 @@ def enrich_geojson_with_ecolens_scores(geojson):
         properties["ECOLENS_FOREST_BASIS"] = result["Forest Basis"]
         properties["ECOLENS_WATER_BASIS"] = result["Water Basis"]
 
+        # Per-indicator grade -> EcoLens score -> stress severity.
+        indicator_details = {}
+
+        for indicator_name, raw_grade in grades.items():
+            indicator_score = environmental_grade_to_score(raw_grade)
+
+            indicator_details[indicator_name] = {
+                "grade": (
+                    str(raw_grade).strip()
+                    if raw_grade not in (None, "")
+                    else None
+                ),
+                "score": indicator_score,
+                "severity": environmental_severity(indicator_score)
+            }
+
+        properties["ECOLENS_INDICATORS"] = indicator_details
+
         if result["Priority Score"] is not None:
             scored_features.append(feature)
 
