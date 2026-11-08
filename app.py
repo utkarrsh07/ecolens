@@ -890,36 +890,31 @@ def enrich_geojson_with_ecolens_scores(geojson):
 
     total_ranked = len(scored_features)
 
-    for rank, feature in enumerate(
-        scored_features,
-        start=1
-    ):
+    # Standard competition ranking ("1-2-2-4"): watersheds with the
+    # same priority score share a rank instead of being ordered
+    # arbitrarily.
+    all_scores = [
+        feature["properties"]["ECOLENS_PRIORITY_SCORE"]
+        for feature in scored_features
+    ]
+
+    for feature in scored_features:
 
         properties = feature["properties"]
+        score = properties["ECOLENS_PRIORITY_SCORE"]
+
+        rank = 1 + sum(1 for other in all_scores if other > score)
+        tied = sum(1 for other in all_scores if other == score)
 
         properties["ECOLENS_PRIORITY_RANK"] = rank
+        properties["ECOLENS_PRIORITY_TIED"] = tied
         properties["ECOLENS_TOTAL_RANKED"] = total_ranked
 
-        if total_ranked > 0:
-
-            percentile = round(
-                (
-                    total_ranked -
-                    rank +
-                    1
-                )
-                /
-                total_ranked
-                *
-                100
-            )
-
-        else:
-            percentile = None
-
-        properties[
-            "ECOLENS_PRIORITY_PERCENTILE"
-        ] = percentile
+        # Share of ranked watersheds with a LOWER priority score.
+        properties["ECOLENS_PRIORITY_PERCENTILE"] = round(
+            sum(1 for other in all_scores if other < score)
+            / total_ranked * 100
+        ) if total_ranked else None
 
     return geojson
 
