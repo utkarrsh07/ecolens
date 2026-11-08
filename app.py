@@ -1004,47 +1004,20 @@ def build_chart_top_subwatersheds(top_df):
 # GEOJSON API FOR FUTURE INTERACTIVE MAP
 # ============================================================
 
-def simplify_coordinates(coords, tolerance=0.00008):
+def simplify_coordinates(geometry, tolerance_metres=None):
     """
-    Reduces the number of coordinate points used to draw
-    watershed polygons in the browser.
+    Simplify a GeoJSON Polygon / MultiPolygon geometry.
+
+    The old version skipped points that were close to the previous point.
+    That is not a real simplification algorithm. This now uses
+    Douglas-Peucker with a tolerance in metres (see geo_service.py).
+    The /api/watersheds pipeline already applies it automatically.
     """
 
-    if not coords:
-        return coords
+    if tolerance_metres is None:
+        tolerance_metres = geo_service.SIMPLIFY_TOLERANCE_METRES
 
-    if (
-        isinstance(coords, list)
-        and len(coords) > 0
-        and isinstance(coords[0], list)
-        and len(coords[0]) >= 2
-        and isinstance(coords[0][0], (int, float))
-    ):
-        simplified = [coords[0]]
-        last_point = coords[0]
-
-        for point in coords[1:-1]:
-            dx = point[0] - last_point[0]
-            dy = point[1] - last_point[1]
-
-            distance = math.sqrt(dx * dx + dy * dy)
-
-            if distance >= tolerance:
-                simplified.append(point)
-                last_point = point
-
-        if len(coords) > 1:
-            simplified.append(coords[-1])
-
-        return simplified
-
-    if isinstance(coords, list):
-        return [
-            simplify_coordinates(item, tolerance)
-            for item in coords
-        ]
-
-    return coords
+    return geo_service.simplify_geometry(geometry, tolerance_metres)
 
 
 @app.route("/api/watersheds")
