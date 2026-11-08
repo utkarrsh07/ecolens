@@ -1318,4 +1318,383 @@
     `;
   }
 
+  // --------------------------------------------------------
+  // PROFILE: SELECTED WATERSHED
+  // --------------------------------------------------------
+
+  function indicatorTile(feature, name) {
+    const item = indicator(feature, name);
+    const p = props(feature);
+    const present = isNum(item.score);
+    const letter = present ? String(item.grade).trim().toUpperCase() : null;
+    const bin = present ? (GRADE_BINS.find((b) => b.letter === letter.charAt(0)) || conditionBin(item.score)) : null;
+
+    const isStrongest = p.ECOLENS_STRONGEST_INDICATOR === name;
+    const isWeakest = p.ECOLENS_WEAKEST_INDICATOR === name && !isStrongest;
+
+    const weight =
+      ENGINE.forest_weights && ENGINE.forest_weights[name] !== undefined
+        ? `${Math.round(ENGINE.forest_weights[name] * 100)}% of forest`
+        : ENGINE.water_weights && ENGINE.water_weights[name] !== undefined
+          ? `${Math.round(ENGINE.water_weights[name] * 100)}% of water`
+          : "published overall";
+
+    return `
+      <div class="ind ${present ? "" : "is-missing"} ${isStrongest || isWeakest ? "is-key" : ""}">
+        <span class="grade-badge ${present ? "" : "missing"}" style="${bin ? `background:${bin.color}` : ""}">
+          ${present ? escapeHtml(letter) : "n/a"}
+        </span>
+        <span>
+          ${isStrongest ? `<span class="ind-flag">Strongest</span>` : ""}
+          ${isWeakest ? `<span class="ind-flag weak">Weakest</span>` : ""}
+          <span class="ind-name">${escapeHtml(INDICATOR_LABELS[name])}</span>
+          <span class="ind-sub">${present ? `${item.score} pts · ${weight}` : "Not reported"}</span>
+        </span>
+      </div>
+    `;
+  }
+
+  function renderProfile(feature) {
+    const p = props(feature);
+    const r = state.region;
+
+    const health = p.ECOLENS_HEALTH_SCORE;
+    const healthBin = conditionBin(health) || { label: "Insufficient data", color: COLORS.missing };
+    const priorityColor = PRIORITY_COLORS[p.ECOLENS_PRIORITY_LABEL] || COLORS.missing;
+
+    const rank = p.ECOLENS_PRIORITY_RANK;
+    const total = p.ECOLENS_TOTAL_RANKED;
+    const higherThan = p.ECOLENS_PRIORITY_PERCENTILE;
+    const tiedOthers = (p.ECOLENS_PRIORITY_TIED || 1) - 1;
+
+    const forestBin = conditionBin(p.ECOLENS_FOREST_SCORE);
+    const waterBin = conditionBin(p.ECOLENS_WATER_SCORE);
+    const stressBin = isNum(p.ECOLENS_STRESS_INDEX)
+      ? STRESS_BINS.find((bin) => p.ECOLENS_STRESS_INDEX >= bin.min)
+      : null;
+
+    const signals = buildSignals(feature);
+
+    const panel = $("profilePanel");
+
+    panel.innerHTML = `
+      <div class="profile">
+
+        <div class="profile-top">
+          <div>
+            <p class="profile-kicker">Subwatershed profile</p>
+            <h2>${escapeHtml(nameOf(feature))}</h2>
+            <p class="profile-rank">
+              ${isNum(rank)
+                ? `Priority rank <b>#${rank}</b> of ${total}` +
+                  (tiedOthers > 0 ? ` (tied with ${tiedOthers} other${tiedOthers === 1 ? "" : "s"})` : "") +
+                  (isNum(higherThan) ? ` · higher priority than ${higherThan}% of watersheds` : "")
+                : "Not ranked — insufficient data"}
+            </p>
+          </div>
+          <button class="icon-btn" id="closeProfile" type="button" title="Back to regional overview (Esc)" aria-label="Close profile">
+            <svg viewBox="0 0 20 20" width="14" height="14"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          </button>
+        </div>
+
+        <div class="hero-row">
+          <div class="gauge-wrap">
+            <div class="gauge">
+              ${gaugeSvg(health, healthBin.color)}
+              <div class="gauge-center">
+                <strong>${fmt(health)}</strong>
+                <span>Health /100</span>
+              </div>
+            </div>
+            <span class="gauge-label"><i class="swatch" style="background:${healthBin.color}"></i>${escapeHtml(healthBin.label)}</span>
+          </div>
+
+          <div class="hero-facts">
+            <div>
+              <div class="fact-label">Restoration priority</div>
+              <div class="priority-badge">
+                <span class="swatch" style="background:${priorityColor}"></span>
+                ${escapeHtml(p.ECOLENS_PRIORITY_LABEL || "—")}
+                <small>${fmt(p.ECOLENS_PRIORITY_SCORE)}/100</small>
+              </div>
+            </div>
+            <div>
+              <div class="fact-label">Evidence coverage</div>
+              <div class="fact-value">${fmt(p.ECOLENS_CONFIDENCE)}% <small>${escapeHtml(p.ECOLENS_CONFIDENCE_LABEL || "")}</small></div>
+              <div class="meter"><i style="width:${fmt(p.ECOLENS_CONFIDENCE)}%"></i></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="block">
+          <div class="block-title">Condition vs region <small>│ marks the regional average</small></div>
+          ${metricRow({
+            label: "Forest condition",
+            value: p.ECOLENS_FOREST_SCORE,
+            average: r.forest,
+            color: forestBin ? forestBin.color : COLORS.missing,
+            foot: versusAverage(p.ECOLENS_FOREST_SCORE, r.forest)
+          })}
+          ${metricRow({
+            label: "Surface-water condition",
+            value: p.ECOLENS_WATER_SCORE,
+            average: r.water,
+            color: waterBin ? waterBin.color : COLORS.missing,
+            foot: isNum(p.ECOLENS_WATER_SCORE)
+              ? versusAverage(p.ECOLENS_WATER_SCORE, r.water)
+              : "No surface-water grades were published for this watershed."
+          })}
+          ${metricRow({
+            label: "Environmental stress",
+            value: p.ECOLENS_STRESS_INDEX,
+            average: r.stress,
+            color: stressBin ? stressBin.color : COLORS.missing,
+            foot: versusAverage(p.ECOLENS_STRESS_INDEX, r.stress, true) + " · higher means more stress"
+          })}
+        </div>
+
+        <div class="block">
+          <div class="block-title">Report-card indicators <small>2023 grades</small></div>
+          <div class="indicator-grid">
+            ${["Forest Cover", "Forest Interior", "Forest Riparian", "Forest Overall",
+               "Benthic", "Phosphorus", "E. coli", "Water Quality Overall"]
+              .map((name) => indicatorTile(feature, name)).join("")}
+          </div>
+        </div>
+
+        ${signals.length ? `
+          <div class="block">
+            <div class="block-title">Signals <small>rule-based</small></div>
+            <ul class="signals">
+              ${signals.map((s) => `
+                <li class="signal ${s.type}">
+                  <span class="signal-icon">${s.icon}</span>
+                  <span>${s.html}</span>
+                </li>`).join("")}
+            </ul>
+          </div>` : ""}
+
+        <div class="block">
+          <div class="block-title">Interpretation</div>
+          <div class="tabs" role="tablist">
+            ${[["analyst", "Analyst"], ["public", "Public"], ["policy", "Policy"]].map(([key, label]) => `
+              <button class="tab ${state.interpretMode === key ? "active" : ""}" data-mode="${key}" type="button" role="tab">${label}</button>
+            `).join("")}
+          </div>
+          <p class="interpretation" id="interpretationText">${interpretation(feature, state.interpretMode)}</p>
+        </div>
+
+        <div class="block">
+          ${calculationHtml(feature)}
+        </div>
+
+        <p class="footnote">
+          Experimental EcoLens analysis of Conservation Halton's 2023 report card — not an official assessment.
+        </p>
+      </div>
+    `;
+
+    panel.scrollTop = 0;
+    animateGauges(panel);
+  }
+
+  // --------------------------------------------------------
+  // STATUS / LOADING
+  // --------------------------------------------------------
+
+  function setStatus(text, kind) {
+    const status = $("mapStatus");
+    status.className = "map-status" + (kind ? " is-" + kind : "");
+    $("mapStatusText").textContent = text;
+  }
+
+  function showLoadError(message) {
+    const overlay = $("mapLoading");
+    overlay.classList.remove("hidden");
+    overlay.innerHTML = `
+      <p>${escapeHtml(message)}</p>
+      <button type="button" id="retryLoad">Try again</button>
+    `;
+    $("retryLoad").addEventListener("click", () => {
+      overlay.innerHTML = `<div class="spinner"></div><p>Loading Conservation Halton watersheds…</p>`;
+      loadWatersheds();
+    });
+    setStatus("Map unavailable", "error");
+  }
+
+  // --------------------------------------------------------
+  // EVENTS
+  // --------------------------------------------------------
+
+  function bindEvents() {
+    $("rankList").addEventListener("click", (event) => {
+      const row = event.target.closest(".rank-item");
+      if (row) selectWatershed(Number(row.dataset.id), { fly: true });
+    });
+
+    $("rankList").addEventListener("mouseover", (event) => {
+      const row = event.target.closest(".rank-item");
+      if (row) setHovered(Number(row.dataset.id));
+    });
+
+    $("rankList").addEventListener("mouseleave", () => setHovered(null));
+
+    $("priorityFilters").addEventListener("click", (event) => {
+      const chip = event.target.closest("[data-filter]");
+      if (chip) setPriorityFilter(chip.dataset.filter);
+    });
+
+    $("searchInput").addEventListener("input", (event) => {
+      state.search = normalize(event.target.value);
+      renderRankList();
+      restyleAll();
+    });
+
+    $("searchInput").addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        const first = sortedFeatures()[0];
+        if (first) selectWatershed(first.__id, { fly: true });
+      }
+    });
+
+    $("resetViewBtn").addEventListener("click", () => {
+      if (state.selectedId !== null) clearSelection();
+      else fitRegion(true);
+    });
+
+    $("profilePanel").addEventListener("click", (event) => {
+      if (event.target.closest("#closeProfile")) {
+        clearSelection();
+        return;
+      }
+
+      const tab = event.target.closest(".tab");
+      if (tab && state.selectedId !== null) {
+        state.interpretMode = tab.dataset.mode;
+        document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("active", t === tab));
+        $("interpretationText").innerHTML = interpretation(
+          state.features[state.selectedId], state.interpretMode
+        );
+        return;
+      }
+
+      const filter = event.target.closest("[data-filter]");
+      if (filter) {
+        setPriorityFilter(filter.dataset.filter);
+        return;
+      }
+
+      const pick = event.target.closest("[data-id]");
+      if (pick) selectWatershed(Number(pick.dataset.id), { fly: true });
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && state.selectedId !== null) {
+        clearSelection();
+      }
+    });
+  }
+
+  // --------------------------------------------------------
+  // METHODOLOGY GRADE COLOURS (static section)
+  // --------------------------------------------------------
+
+  function colourGradeScale() {
+    document.querySelectorAll(".grade-cell").forEach((cell) => {
+      const letter = cell.querySelector("strong").textContent.trim().charAt(0);
+      const bin = GRADE_BINS.find((b) => b.letter === letter);
+      if (bin) cell.style.borderTopColor = bin.color;
+    });
+  }
+
+  // --------------------------------------------------------
+  // LOAD
+  // --------------------------------------------------------
+
+  async function loadWatersheds() {
+    setStatus("Loading watersheds…", "");
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+
+    try {
+      const response = await fetch("/api/watersheds", { signal: controller.signal });
+      clearTimeout(timeout);
+
+      if (!response.ok) throw new Error(`Server returned ${response.status}`);
+
+      const source = response.headers.get("X-EcoLens-Source") || "live";
+      const geojson = await response.json();
+
+      if (!geojson || !Array.isArray(geojson.features)) {
+        throw new Error("Invalid GeoJSON response");
+      }
+
+      geojson.features.forEach((feature, index) => {
+        feature.__id = index;
+      });
+
+      state.features = geojson.features;
+      state.region = computeRegion(state.features);
+
+      if (geoLayer) {
+        geoLayer.remove();
+        state.layers.clear();
+      }
+
+      addWatershedLayer(geojson);
+      fitRegion(false);
+
+      renderKpis();
+      renderMetricPicker();
+      renderFilters();
+      renderRankList();
+      renderLegend();
+
+      if (!selectFromHash()) renderOverview();
+
+      setStatus(
+        source === "snapshot"
+          ? `${state.features.length} watersheds · saved copy`
+          : `${state.features.length} watersheds · Conservation Halton API`,
+        source === "snapshot" ? "snapshot" : "live"
+      );
+
+      $("mapLoading").classList.add("hidden");
+
+    } catch (error) {
+      clearTimeout(timeout);
+      console.error("EcoLens map error:", error);
+      showLoadError(
+        error.name === "AbortError"
+          ? "The watershed data took too long to load."
+          : "Watershed data could not be loaded."
+      );
+    }
+  }
+
+  // --------------------------------------------------------
+  // START
+  // --------------------------------------------------------
+
+  function start() {
+    colourGradeScale();
+
+    if (!$("watershedMap") || typeof L === "undefined") {
+      console.error("EcoLens: Leaflet failed to load.");
+      return;
+    }
+
+    createMap();
+    bindEvents();
+    loadWatersheds();
+
+    window.addEventListener("resize", () => map && map.invalidateSize());
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", start);
+  } else {
+    start();
+  }
 })();
