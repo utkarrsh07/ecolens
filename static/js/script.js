@@ -372,4 +372,269 @@
     `;
   }
 
+  // --------------------------------------------------------
+  // MAP
+  // --------------------------------------------------------
+
+  function createMap() {
+    map = L.map("watershedMap", {
+      preferCanvas: true,
+      zoomSnap: 0.25,
+      zoomDelta: 0.5,
+      wheelPxPerZoomLevel: 100,
+      minZoom: 8,
+      maxZoom: 16
+    }).setView([43.45, -79.9], 10);
+
+    map.createPane("labels");
+    map.getPane("labels").style.zIndex = 650;
+    map.getPane("labels").style.pointerEvents = "none";
+
+    const attribution =
+      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> ' +
+      '&copy; <a href="https://carto.com/attributions">CARTO</a> · ' +
+      "Data: Conservation Halton Open Data";
+
+    L.tileLayer(
+      "https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png",
+      { subdomains: "abcd", maxZoom: 19, attribution }
+    ).addTo(map);
+
+    // Place names drawn ABOVE the coloured polygons so they stay readable.
+    L.tileLayer(
+      "https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png",
+      { subdomains: "abcd", maxZoom: 19, pane: "labels" }
+    ).addTo(map);
+  }
+
+  function styleFor(feature) {
+    const metric = metricByKey(state.metricKey);
+    const bin = binFor(metric, feature);
+    const id = feature.__id;
+
+    const isSelected = id === state.selectedId;
+    const isHovered = id === state.hoveredId;
+    const isFilteredOut = !passesFilters(feature);
+    const someoneSelected = state.selectedId !== null;
+
+    const style = {
+      fillColor: bin ? bin.color : COLORS.missing,
+      fillOpacity: bin ? 0.78 : 0.55,
+      color: "#08131d",
+      weight: 1,
+      opacity: 1,
+      dashArray: null
+    };
+
+    if (!bin) {
+      style.color = "#4d6074";
+      style.dashArray = "3 3";
+    }
+
+    if (someoneSelected && !isSelected) {
+      style.fillOpacity *= 0.55;
+    }
+
+    if (isFilteredOut) {
+      style.fillOpacity = 0.12;
+      style.opacity = 0.35;
+    }
+
+    if (isHovered) {
+      style.color = "#ffffff";
+      style.weight = 2;
+      style.dashArray = null;
+      style.fillOpacity = Math.max(style.fillOpacity, 0.85);
+    }
+
+    if (isSelected) {
+      style.color = "#ffffff";
+      style.weight = 3;
+      style.dashArray = null;
+      style.fillOpacity = 0.92;
+    }
+
+    return style;
+  }
+
+  function restyleAll() {
+    if (!geoLayer) return;
+    geoLayer.eachLayer((layer) => layer.setStyle(styleFor(layer.feature)));
+
+    const selected = state.layers.get(state.selectedId);
+    if (selected) selected.bringToFront();
+  }
+
+  function restyleOne(id) {
+    const layer = state.layers.get(id);
+    if (!layer) return;
+    layer.setStyle(styleFor(layer.feature));
+    if (id === state.hoveredId || id === state.selectedId) {
+      layer.bringToFront();
+    }
+  }
+
+  function tooltipHtml(feature) {
+    const metric = metricByKey(state.metricKey);
+    const bin = binFor(metric, feature);
+    const p = props(feature);
+
+    const priorityLine =
+      metric.kind === "priority"
+        ? ""
+        : `<div class="tt-row">Priority: ${escapeHtml(p.ECOLENS_PRIORITY_LABEL || "—")}</div>`;
+
+    return `
+      <strong>${escapeHtml(nameOf(feature))}</strong>
+      <div class="tt-row">
+        <span class="swatch ${bin ? "" : "missing"}" style="background:${bin ? bin.color : COLORS.missing}"></span>
+        ${escapeHtml(metric.label)}: <b>${escapeHtml(formatMetric(metric, feature))}</b>
+        ${bin && metric.kind !== "grade" ? "· " + escapeHtml(bin.label) : ""}
+      </div>
+      ${priorityLine}
+    `;
+  }
+
+  function addWatershedLayer(geojson) {
+    const renderer = L.canvas({ padding: 0.4, tolerance: 4 });
+
+    geoLayer = L.geoJSON(geojson, {
+      renderer,
+      style: styleFor,
+      onEachFeature: (feature, layer) => {
+        state.layers.set(feature.__id, layer);
+
+        layer.bindTooltip(() => tooltipHtml(feature), {
+          sticky: true,
+          direction: "top",
+          offset: [0, -10],
+          className: "eco-tooltip",
+          opacity: 1
+        });
+
+        layer.on({
+          mouseover: () => setHovered(feature.__id),
+          mouseout: () => setHovered(null),
+          click: () => selectWatershed(feature.__id, { fly: true })
+        });
+      }
+    }).addTo(map);
+  }
+
+  function fitRegion(animate) {
+    if (!geoLayer) return;
+    const bounds = geoLayer.getBounds();
+    if (bounds.isValid()) {
+      map.fitBounds(bounds, {
+        padding: [24, 24],
+        paddingTopLeft: [24, 70],
+        animate: !!animate
+      });
+    }
+  }
+
+  function setHovered(id) {
+    const previous = state.hoveredId;
+    if (previous === id) return;
+
+    state.hoveredId = id;
+
+    if (previous !== null) restyleOne(previous);
+    if (id !== null) restyleOne(id);
+
+    document
+      .querySelectorAll(".rank-item.hovered")
+      .forEach((el) => el.classList.remove("hovered"));
+
+    if (id !== null) {
+      const row = document.querySelector(`.rank-item[data-id="${id}"]`);
+      if (row) row.classList.add("hovered");
+    }
+  }
+
+  // --------------------------------------------------------
+  // LEGEND
+  // --------------------------------------------------------
+
+  function renderLegend() {
+    const metric = metricByKey(state.metricKey);
+    const bins = legendBins(metric);
+
+    const counts = new Map();
+    let missing = 0;
+
+    state.features.forEach((feature) => {
+      const bin = binFor(metric, feature);
+      if (!bin) {
+        missing += 1;
+        return;
+      }
+      counts.set(bin.label, (counts.get(bin.label) || 0) + 1);
+    });
+
+    const subtitle = {
+      priority: "0.65 × condition deficit + 0.35 × stress",
+      condition: "EcoLens score, 0–100 (higher is better)",
+      stress: "Weighted severity of weak indicators (higher is worse)",
+      coverage: "Share of indicator weight actually reported",
+      grade: "Conservation Halton 2023 published grade"
+    }[metric.kind];
+
+    const rows = bins.map((bin) => `
+      <div class="legend-item">
+        <span class="swatch" style="background:${bin.color}"></span>
+        <span>${escapeHtml(bin.label)}${bin.range && metric.kind !== "grade" ? ` <em>${escapeHtml(bin.range)}</em>` : ""}</span>
+        <em>${counts.get(bin.label) || 0}</em>
+      </div>
+    `).join("");
+
+    const missingRow = missing
+      ? `
+        <div class="legend-item">
+          <span class="swatch missing"></span>
+          <span>${metric.kind === "grade" ? "Not reported" : "Insufficient data"}</span>
+          <em>${missing}</em>
+        </div>`
+      : "";
+
+    $("mapLegend").innerHTML = `
+      <div class="legend-title">${escapeHtml(metric.label)}</div>
+      <div class="legend-sub">${escapeHtml(subtitle)}</div>
+      <div class="legend-items">${rows}${missingRow}</div>
+    `;
+  }
+
+  // --------------------------------------------------------
+  // METRIC PICKER
+  // --------------------------------------------------------
+
+  function renderMetricPicker() {
+    const select = $("metricSelect");
+    const groups = {};
+
+    METRICS.forEach((metric) => {
+      (groups[metric.group] = groups[metric.group] || []).push(metric);
+    });
+
+    select.innerHTML = Object.entries(groups).map(([group, metrics]) => `
+      <optgroup label="${escapeHtml(group)}">
+        ${metrics.map((metric) => {
+          const available = state.features.some((f) => isNum(metric.value(f)));
+          return `<option value="${metric.key}" ${available ? "" : "disabled"}>
+            ${escapeHtml(metric.label)}${available ? "" : " (not reported in 2023)"}
+          </option>`;
+        }).join("")}
+      </optgroup>
+    `).join("");
+
+    select.value = state.metricKey;
+
+    select.addEventListener("change", () => {
+      state.metricKey = select.value;
+      restyleAll();
+      renderLegend();
+      renderRankList();
+    });
+  }
+
 })();
